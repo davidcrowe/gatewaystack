@@ -635,5 +635,3 @@ If your IdP supports **Dynamic Client Registration (DCR)**, you can enable it in
 * Use gateway **identity injection** (e.g. `X-User-Id`) to pass user context downstream — never expose upstream API keys to the LLM client.
 
 ---
-
-✅ With this section added, developers reading your README will immediately recognize how to connect an MCP client to your gateway and verify user-scoped OAuth behavior end-to-end.
