@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0",
+  "spec": "Apps SDK OAuth 2.1 + MCP Authorization (subset)",
+  "categories": {
+    "pkce": "pass",
+    "jwt_verify": "pass",
+    "scope_enforcement": "pass",
+    "allowlist": "pass",
+    "expiry": "pass"
+  },
+  "timestamp": "2025-11-26T21:38:28.617Z"
+}

@@ -4,34 +4,54 @@
     { "path": "apps/gateway-server" },
     { "path": "apps/admin-ui" },
 
-    { "path": "packages/access-core" },
-    { "path": "packages/access-express" },
-    { "path": "packages/observability-core" },
-    { "path": "packages/observability-express" },
-    { "path": "packages/routing-core" },
-    { "path": "packages/routing-express" },
-    { "path": "packages/audit-core" },
-    { "path": "packages/audit-express" },
-    { "path": "packages/auth-core" },
-    { "path": "packages/auth-express" },
-    { "path": "packages/rate-limit-core" },
-    { "path": "packages/rate-limit-express" }
+    { "path": "packages/identifiabl-core" },
+    { "path": "packages/identifiabl" },
+
+    { "path": "packages/transformabl-core" },
+    { "path": "packages/transformabl" },
+
+    { "path": "packages/validatabl-core" },
+    { "path": "packages/validatabl" },
+
+    { "path": "packages/limitabl-core" },
+    { "path": "packages/limitabl" },
+
+    { "path": "packages/proxyabl-core" },
+    { "path": "packages/proxyabl" },
+
+    { "path": "packages/explicabl-core" },
+    { "path": "packages/explicabl" },
+
+    { "path": "packages/request-context" },
+    { "path": "packages/integrations" },
+    { "path": "packages/compat" }
   ],
   "compilerOptions": {
     "composite": true,
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@gatewaystack/access-core": ["packages/access-core/src"],
-      "@gatewaystack/access-express": ["packages/access-express/src"],
-      "@gatewaystack/routing-core": ["packages/routing-core/src"],
-      "@gatewaystack/routing-express": ["packages/routing-express/src"],
-      "@gatewaystack/policy-core": ["packages/policy-core/src"],
-      "@gatewaystack/rate-limit-core": ["packages/rate-limit-core/src"],
-      "@gatewaystack/rate-limit-express": ["packages/rate-limit-express/src"],
-      "@gatewaystack/observability-express": ["packages/observability-express/src"],
-      "@gatewaystack/audit-core": ["packages/audit-core/src"],
-      "@gatewaystack/audit-express": ["packages/audit-express/src"]
+      "@gatewaystack/identifiabl-core": ["packages/identifiabl-core/src"],
+      "@gatewaystack/identifiabl": ["packages/identifiabl/src"],
+
+      "@gatewaystack/transformabl-core": ["packages/transformabl-core/src"],
+      "@gatewaystack/transformabl": ["packages/transformabl/src"],
+
+      "@gatewaystack/validatabl-core": ["packages/validatabl-core/src"],
+      "@gatewaystack/validatabl": ["packages/validatabl/src"],
+
+      "@gatewaystack/limitabl-core": ["packages/limitabl-core/src"],
+      "@gatewaystack/limitabl": ["packages/limitabl/src"],
+
+      "@gatewaystack/proxyabl-core": ["packages/proxyabl-core/src"],
+      "@gatewaystack/proxyabl": ["packages/proxyabl/src"],
+
+      "@gatewaystack/explicabl-core": ["packages/explicabl-core/src"],
+      "@gatewaystack/explicabl": ["packages/explicabl/src"],
+
+      "@gatewaystack/request-context": ["packages/request-context/src"],
+      "@gatewaystack/integrations": ["packages/integrations/src"],
+      "@gatewaystack/compat": ["packages/compat/src"]
     }
   },
   "exclude": ["**/*.config.ts", "**/*.config.js", "node_modules", "dist"]

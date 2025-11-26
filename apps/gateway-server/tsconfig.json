@@ -2,7 +2,6 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src",
     "module": "ES2022",
     "target": "ES2022",
     "moduleResolution": "Bundler",
@@ -16,17 +15,17 @@
   },
   "include": ["src"],
   "references": [
-    { "path": "../../packages/access-core" },
-    { "path": "../../packages/access-express" },
-    { "path": "../../packages/observability-core" },
-    { "path": "../../packages/observability-express" },
-    { "path": "../../packages/routing-core" },
-    { "path": "../../packages/routing-express" },
-    { "path": "../../packages/audit-core" },
-    { "path": "../../packages/audit-express" },
-    { "path": "../../packages/auth-core" },
-    { "path": "../../packages/auth-express" },
-    { "path": "../../packages/rate-limit-core" },
-    { "path": "../../packages/rate-limit-express" }
+    { "path": "../../packages/identifiabl-core" },
+    { "path": "../../packages/identifiabl" },
+    { "path": "../../packages/transformabl-core" },
+    { "path": "../../packages/transformabl" },
+    { "path": "../../packages/validatabl-core" },
+    { "path": "../../packages/validatabl" },
+    { "path": "../../packages/limitabl-core" },
+    { "path": "../../packages/limitabl" },
+    { "path": "../../packages/proxyabl-core" },
+    { "path": "../../packages/proxyabl" },
+    { "path": "../../packages/explicabl-core" },
+    { "path": "../../packages/explicabl" },
   ]
 }

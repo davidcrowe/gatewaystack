@@ -1,23 +1,42 @@
 import express, { type RequestHandler } from "express";
 import bodyParser from "body-parser";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
-import { createRemoteJWKSet, jwtVerify } from "jose";
 
-import { protectedResourceRouter } from "@gatewaystack/access-express";
-import { healthRoutes } from "@gatewaystack/observability-express";
-import { toolGatewayRouter } from "@gatewaystack/routing-express";
-import { auth0LogsWebhook } from "@gatewaystack/audit-express";
+import { identifiabl } from "@gatewaystack/identifiabl";
+import { withTransformabl } from "@gatewaystack/transformabl";
+import {
+  protectedResourceRouter,
+  requireScope,
+} from "@gatewaystack/validatabl";
+import { withLimitabl } from "@gatewaystack/limitabl";
+import { toolGatewayRouter } from "@gatewaystack/proxyabl";
+import { explicablRouter } from "@gatewaystack/explicabl";
+
 import { testEchoRoutes } from "./routes/testEcho";
 
+/**
+ * GatewayStack reference server
+ *
+ * This app wires together all 6 governance layers:
+ *  1) Identifiabl   – authentication / identity (JWT → req.user)
+ *  2) Transformabl  – request transformation (PII redaction, classification)
+ *  3) Validatabl    – scopes, RBAC, protected resource metadata
+ *  4) Limitabl      – per-identity rate limiting / usage control
+ *  5) Proxyabl      – provider routing, tool / MCP gateway
+ *  6) Explicabl     – health, logging, audit, webhooks
+ */
 export function buildApp(env: NodeJS.ProcessEnv) {
+  // -----------------------------
+  // Boot & configuration
+  // -----------------------------
   console.log("[boot] ENABLE_TEST_ROUTES=%s", env.ENABLE_TEST_ROUTES);
   console.log("[boot] ROUTE_ALLOWLIST=%s", env.ROUTE_ALLOWLIST);
 
   const DEMO = env.DEMO_MODE === "true";
 
-  // pick DEMO_* when DEMO_MODE=true, otherwise the real ones
+  // OIDC / OAuth config (used by Identifiabl + Validatabl)
   const OAUTH_ISSUER = (DEMO ? env.OAUTH_ISSUER_DEMO : env.OAUTH_ISSUER) || "";
-  const OAUTH_AUDIENCE = (DEMO ? env.OAUTH_AUDIENCE_DEMO : env.OAUTH_AUDIENCE)!;
+  const OAUTH_AUDIENCE =
+    (DEMO ? env.OAUTH_AUDIENCE_DEMO : env.OAUTH_AUDIENCE)!;
   const OAUTH_JWKS_URI =
     (DEMO ? env.OAUTH_JWKS_URI_DEMO : env.OAUTH_JWKS_URI) ||
     env.JWKS_URI_FALLBACK ||
@@ -42,21 +61,28 @@ export function buildApp(env: NodeJS.ProcessEnv) {
     );
   }
 
+  // Rate limiting config (Limitabl)
+  const windowMs = +(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000);
+  const limit = +(process.env.RATE_LIMIT_MAX ?? 10);
+
+  // -----------------------------
+  // Core Express setup
+  // -----------------------------
   const app = express();
   app.use(bodyParser.json({ limit: "2mb" }));
 
+  // Simple root health check (extra; Explicabl has richer health)
   app.get("/", (_req, res) => res.status(200).json({ ok: true }));
 
-  // ✅ Health (public)
-  app.use(healthRoutes(env) as unknown as RequestHandler);
-
-  // ✅ Test routes (public)
+  // Optional test-only routes (public)
   if (env.ENABLE_TEST_ROUTES === "true") {
     console.log("[__test__] routes enabled");
     app.use("/__test__", testEchoRoutes(env));
   }
 
-  // ✅ PRM / protected resource metadata (public)
+  // -----------------------------
+  // Layer 3: Validatabl (public PRM)
+  // -----------------------------
   app.use(
     protectedResourceRouter({
       issuer: OAUTH_ISSUER.replace(/\/+$/, ""),
@@ -65,76 +91,40 @@ export function buildApp(env: NodeJS.ProcessEnv) {
     }) as unknown as RequestHandler
   );
 
-  // ---- JWT verification config ----
-  const rawIssuer = OAUTH_ISSUER;
-  const issuerNoSlash = rawIssuer.replace(/\/+$/, "");
-
-  const issuerPattern = new RegExp(
-    `^${issuerNoSlash.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\/?$`
-  );
-
-  const audience = OAUTH_AUDIENCE;
-  const jwksUri = OAUTH_JWKS_URI || `${issuerNoSlash}/.well-known/jwks.json`;
-  const JWKS = createRemoteJWKSet(new URL(jwksUri));
-
-  const requireJwt: RequestHandler = async (req: any, res, next) => {
-    try {
-      const auth = req.headers.authorization || "";
-      const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-      if (!token) return res.status(401).json({ error: "missing_bearer" });
-
-      // Verify signature & audience only (issuer checked manually)
-      const { payload } = await jwtVerify(token, JWKS, { audience });
-
-      const iss = String(payload.iss || "");
-      if (!issuerPattern.test(iss)) {
-        return res.status(401).json({
-          error: "invalid_token",
-          detail: `unexpected "iss" claim value: ${iss}`,
-        });
-      }
-
-      req.user = payload;
-      next();
-    } catch (e: any) {
-      res.status(401).json({ error: "invalid_token", detail: e?.message });
-    }
-  };
-
-  // ---- simple scope helpers for demos ----
-  const hasScope = (req: any, scope: string) => {
-    const s: string =
-      (req.user?.scope as string) ||
-      (Array.isArray(req.user?.scopes) ? req.user.scopes.join(" ") : "");
-    return new RegExp(`(^|\\s)${scope}(\\s|$)`).test(s);
-  };
-
-  const requireScope =
-    (scope: string): RequestHandler =>
-    (req: any, res, next) => {
-      if (!hasScope(req, scope)) {
-        return res.status(403).json({ error: "insufficient_scope", needed: scope });
-      }
-      next();
-    };
-
-  // 🧯 Per-user rate limit (applies only to protected area)
-  const limiter = rateLimit({
-    windowMs: +(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000),
-    limit: +(process.env.RATE_LIMIT_MAX ?? 10),
-    keyGenerator: (req: any) =>
-      req.user?.sub || req.user?.org_id || ipKeyGenerator(req),
-    standardHeaders: true,
-    legacyHeaders: false,
+  // -----------------------------
+  // Layer 1: Identifiabl (JWT → req.user)
+  // -----------------------------
+  const identifiablMiddleware = identifiabl({
+    issuer: OAUTH_ISSUER,
+    audience: OAUTH_AUDIENCE,
+    jwksUri: OAUTH_JWKS_URI || undefined,
   });
 
-  // 🔐 Mount protected area
-  app.use("/protected", requireJwt, limiter);
+  // -----------------------------
+  // Layer 4: Limitabl (per-identity rate limiting)
+  // -----------------------------
+  const limitablMiddleware = withLimitabl({ windowMs, limit });
+
+  // -----------------------------
+  // Layer 2: Transformabl (currently a no-op)
+  // -----------------------------
+  const transformablMiddleware = withTransformabl({});
+
+  // -----------------------------
+  // Protected area pipeline:
+  // Identifiabl → Limitabl → Transformabl → Handlers
+  // -----------------------------
+  app.use(
+    "/protected",
+    identifiablMiddleware,
+    limitablMiddleware,
+    transformablMiddleware
+  );
 
   // READ example (no extra scope)
   app.get("/protected/ping", (_req, res) => res.json({ ok: true }));
 
-  // WRITE example (requires tool:write)
+  // WRITE example (requires tool:write via Validatabl)
   app.post("/protected/echo", requireScope("tool:write"), (req: any, res) => {
     res.json({
       ok: true,
@@ -143,11 +133,15 @@ export function buildApp(env: NodeJS.ProcessEnv) {
     });
   });
 
-  // 🔐 Gateway (proxy/MCP/etc.)
+  // -----------------------------
+  // Layer 5: Proxyabl (tool / MCP gateway)
+  // -----------------------------
   app.use(toolGatewayRouter as unknown as RequestHandler);
 
-  // 🔐 Webhooks (they do their own secret checks)
-  app.use("/webhooks/auth0", auth0LogsWebhook as unknown as RequestHandler);
+  // -----------------------------
+  // Layer 6: Explicabl (health, logs, webhooks)
+  // -----------------------------
+  app.use(explicablRouter(env) as unknown as RequestHandler);
 
   return app;
 }

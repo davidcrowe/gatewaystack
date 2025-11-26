@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/validatabl",
+    "composite": true
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../validatabl-core" }
+  ]
+}
