@@ -1,2 +1,3 @@
-export { requireScope } from "./requireScope";
-export * from "./protectedResourceRouter";
+// packages/validatabl/src/index.ts
+export { requireScope } from "./requireScope.js";
+export * from "./protectedResourceRouter.js";
