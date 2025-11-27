@@ -11,7 +11,32 @@
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "types": []
+    "types": [],
+    "baseUrl": ".",
+    "paths": {
+      "@gatewaystack/identifiabl-core": ["packages/identifiabl-core/dist"],
+      "@gatewaystack/identifiabl": ["packages/identifiabl/dist"],
+
+      "@gatewaystack/transformabl-core": ["packages/transformabl-core/dist"],
+      "@gatewaystack/transformabl": ["packages/transformabl/dist"],
+
+      "@gatewaystack/validatabl-core": ["packages/validatabl-core/dist"],
+      "@gatewaystack/validatabl": ["packages/validatabl/dist"],
+
+      "@gatewaystack/limitabl-core": ["packages/limitabl-core/dist"],
+      "@gatewaystack/limitabl": ["packages/limitabl/dist"],
+
+      "@gatewaystack/proxyabl-core": ["packages/proxyabl-core/dist"],
+      "@gatewaystack/proxyabl": ["packages/proxyabl/dist"],
+
+      "@gatewaystack/explicabl-core": ["packages/explicabl-core/dist"],
+      "@gatewaystack/explicabl": ["packages/explicabl/dist"],
+
+      "@gatewaystack/request-context": ["packages/request-context/dist"],
+      "@gatewaystack/integrations": ["packages/integrations/dist"],
+      "@gatewaystack/compat": ["packages/compat/dist"]
+    }
   },
   "exclude": ["dist", "build", "node_modules"]
 }
+
