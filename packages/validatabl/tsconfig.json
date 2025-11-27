@@ -3,7 +3,11 @@
   "compilerOptions": {
     "composite": true,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "baseUrl": "../..",
+    "paths": {
+      "@gatewaystack/validatabl-core": ["packages/validatabl-core/dist"]
+    }
   },
   "include": ["src"],
   "references": [
