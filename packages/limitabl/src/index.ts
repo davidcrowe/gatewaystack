@@ -19,7 +19,7 @@ export interface LimitablConfig {
  *  - Fallback to req.user.org_id
  *  - Fallback to IP address
  */
-export function withLimitabl(config: LimitablConfig): RequestHandler {
+export function limitabl(config: LimitablConfig): RequestHandler {
   const limiter = rateLimit({
     windowMs: config.windowMs,
     limit: config.limit,

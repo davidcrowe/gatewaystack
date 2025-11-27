@@ -18,7 +18,7 @@ export interface TransformablConfig {
  *  - annotate requests with classification
  *  - normalize input into a canonical shape
  */
-export function withTransformabl(
+export function transformabl(
   _config?: TransformablConfig
 ): RequestHandler {
   const middleware: RequestHandler = (req, _res, next) => {

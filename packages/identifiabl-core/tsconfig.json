@@ -1,10 +1,21 @@
 {
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "jsx": "react-jsx",
-    "outDir": "../../dist/admin-ui",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
     "rootDir": "src",
-    "composite": true
+    "outDir": "dist",
+    "module": "commonjs",
+    "target": "ES2020",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+
+    "baseUrl": ".",   // 👈 relative to packages/identifiabl-core
+    "paths": {
+      "@gatewaystack/request-context": ["../request-context/dist"]
+    }
   },
   "include": ["src"]
 }

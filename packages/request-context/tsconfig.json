@@ -1,9 +1,16 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
+    "declaration": true,
+    "declarationMap": true,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "module": "commonjs",
+    "target": "ES2020",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
   },
   "include": ["src"]
 }

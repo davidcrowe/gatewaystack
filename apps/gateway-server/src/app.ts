@@ -2,12 +2,12 @@ import express, { type RequestHandler } from "express";
 import bodyParser from "body-parser";
 
 import { identifiabl } from "@gatewaystack/identifiabl";
-import { withTransformabl } from "@gatewaystack/transformabl";
+import { transformabl } from "@gatewaystack/transformabl";
 import {
   protectedResourceRouter,
   requireScope,
 } from "@gatewaystack/validatabl";
-import { withLimitabl } from "@gatewaystack/limitabl";
+import { limitabl } from "@gatewaystack/limitabl";
 import { toolGatewayRouter } from "@gatewaystack/proxyabl";
 import { explicablRouter } from "@gatewaystack/explicabl";
 
@@ -35,17 +35,9 @@ export function buildApp(env: NodeJS.ProcessEnv) {
 
   // OIDC / OAuth config (used by Identifiabl + Validatabl)
   const OAUTH_ISSUER = (DEMO ? env.OAUTH_ISSUER_DEMO : env.OAUTH_ISSUER) || "";
-  const OAUTH_AUDIENCE =
-    (DEMO ? env.OAUTH_AUDIENCE_DEMO : env.OAUTH_AUDIENCE)!;
-  const OAUTH_JWKS_URI =
-    (DEMO ? env.OAUTH_JWKS_URI_DEMO : env.OAUTH_JWKS_URI) ||
-    env.JWKS_URI_FALLBACK ||
-    "";
-
-  const OAUTH_SCOPES = (
-    (DEMO ? env.OAUTH_SCOPES_DEMO : env.OAUTH_SCOPES) ||
-    "openid email profile"
-  )
+  const OAUTH_AUDIENCE = (DEMO ? env.OAUTH_AUDIENCE_DEMO : env.OAUTH_AUDIENCE)!;
+  const OAUTH_JWKS_URI = (DEMO ? env.OAUTH_JWKS_URI_DEMO : env.OAUTH_JWKS_URI) || env.JWKS_URI_FALLBACK ||"";
+  const OAUTH_SCOPES = ((DEMO ? env.OAUTH_SCOPES_DEMO : env.OAUTH_SCOPES) || "openid email profile")
     .trim()
     .split(/\s+/);
 
@@ -61,7 +53,7 @@ export function buildApp(env: NodeJS.ProcessEnv) {
     );
   }
 
-  // Rate limiting config (Limitabl)
+  // Rate limiting config (limitabl)
   const windowMs = +(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000);
   const limit = +(process.env.RATE_LIMIT_MAX ?? 10);
 
@@ -71,7 +63,7 @@ export function buildApp(env: NodeJS.ProcessEnv) {
   const app = express();
   app.use(bodyParser.json({ limit: "2mb" }));
 
-  // Simple root health check (extra; Explicabl has richer health)
+  // Simple root health check (extra; explicabl has richer health)
   app.get("/", (_req, res) => res.status(200).json({ ok: true }));
 
   // Optional test-only routes (public)
@@ -81,7 +73,22 @@ export function buildApp(env: NodeJS.ProcessEnv) {
   }
 
   // -----------------------------
-  // Layer 3: Validatabl (public PRM)
+  // Layer 1: identifiabl (JWT → req.user)
+  // -----------------------------
+  const identifiablMiddleware = identifiabl({
+    issuer: OAUTH_ISSUER,
+    audience: OAUTH_AUDIENCE,
+    jwksUri: OAUTH_JWKS_URI || undefined,
+  });
+
+  // -----------------------------
+  // Layer 2: transformabl (currently a no-op)
+  // -----------------------------
+  const transformablMiddleware = transformabl({});
+
+  // -----------------------------
+  // Layer 3: Mount validatabl’s PRM router early for public metadata
+  // validatabl is added as added via requireScope() in the protected area below
   // -----------------------------
   app.use(
     protectedResourceRouter({
@@ -92,39 +99,25 @@ export function buildApp(env: NodeJS.ProcessEnv) {
   );
 
   // -----------------------------
-  // Layer 1: Identifiabl (JWT → req.user)
+  // Layer 4: limitabl (per-identity rate limiting)
   // -----------------------------
-  const identifiablMiddleware = identifiabl({
-    issuer: OAUTH_ISSUER,
-    audience: OAUTH_AUDIENCE,
-    jwksUri: OAUTH_JWKS_URI || undefined,
-  });
-
-  // -----------------------------
-  // Layer 4: Limitabl (per-identity rate limiting)
-  // -----------------------------
-  const limitablMiddleware = withLimitabl({ windowMs, limit });
-
-  // -----------------------------
-  // Layer 2: Transformabl (currently a no-op)
-  // -----------------------------
-  const transformablMiddleware = withTransformabl({});
+  const limitablMiddleware = limitabl({ windowMs, limit });
 
   // -----------------------------
   // Protected area pipeline:
-  // Identifiabl → Limitabl → Transformabl → Handlers
+  // identifiabl → transformabl → limitabl → Handlers
   // -----------------------------
   app.use(
     "/protected",
     identifiablMiddleware,
-    limitablMiddleware,
-    transformablMiddleware
+    transformablMiddleware,
+    limitablMiddleware
   );
 
   // READ example (no extra scope)
   app.get("/protected/ping", (_req, res) => res.json({ ok: true }));
 
-  // WRITE example (requires tool:write via Validatabl)
+  // WRITE example (requires tool:write via validatabl)
   app.post("/protected/echo", requireScope("tool:write"), (req: any, res) => {
     res.json({
       ok: true,
@@ -134,12 +127,12 @@ export function buildApp(env: NodeJS.ProcessEnv) {
   });
 
   // -----------------------------
-  // Layer 5: Proxyabl (tool / MCP gateway)
+  // Layer 5: proxyabl (tool / MCP gateway)
   // -----------------------------
   app.use(toolGatewayRouter as unknown as RequestHandler);
 
   // -----------------------------
-  // Layer 6: Explicabl (health, logs, webhooks)
+  // Layer 6: explicabl (health, logs, webhooks)
   // -----------------------------
   app.use(explicablRouter(env) as unknown as RequestHandler);
 

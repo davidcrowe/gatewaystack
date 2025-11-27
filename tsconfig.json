@@ -49,7 +49,7 @@
       "@gatewaystack/explicabl-core": ["packages/explicabl-core/src"],
       "@gatewaystack/explicabl": ["packages/explicabl/src"],
 
-      "@gatewaystack/request-context": ["packages/request-context/src"],
+      "@gatewaystack/request-context": ["packages/request-context/dist"],
       "@gatewaystack/integrations": ["packages/integrations/src"],
       "@gatewaystack/compat": ["packages/compat/src"]
     }
