@@ -13,28 +13,28 @@
     "resolveJsonModule": true,
     "types": [],
     "baseUrl": ".",
-    "paths": {
-      "@gatewaystack/identifiabl-core": ["packages/identifiabl-core/dist"],
-      "@gatewaystack/identifiabl": ["packages/identifiabl/dist"],
+        "paths": {
+      "@gatewaystack/identifiabl-core": ["packages/identifiabl-core/src"],
+      "@gatewaystack/identifiabl": ["packages/identifiabl/src"],
 
-      "@gatewaystack/transformabl-core": ["packages/transformabl-core/dist"],
-      "@gatewaystack/transformabl": ["packages/transformabl/dist"],
+      "@gatewaystack/transformabl-core": ["packages/transformabl-core/src"],
+      "@gatewaystack/transformabl": ["packages/transformabl/src"],
 
-      "@gatewaystack/validatabl-core": ["packages/validatabl-core/dist"],
-      "@gatewaystack/validatabl": ["packages/validatabl/dist"],
+      "@gatewaystack/validatabl-core": ["packages/validatabl-core/src"],   // 👈 change to src
+      "@gatewaystack/validatabl": ["packages/validatabl/src"],             // 👈 change to src
 
-      "@gatewaystack/limitabl-core": ["packages/limitabl-core/dist"],
-      "@gatewaystack/limitabl": ["packages/limitabl/dist"],
+      "@gatewaystack/limitabl-core": ["packages/limitabl-core/src"],
+      "@gatewaystack/limitabl": ["packages/limitabl/src"],
 
-      "@gatewaystack/proxyabl-core": ["packages/proxyabl-core/dist"],
-      "@gatewaystack/proxyabl": ["packages/proxyabl/dist"],
+      "@gatewaystack/proxyabl-core": ["packages/proxyabl-core/src"],
+      "@gatewaystack/proxyabl": ["packages/proxyabl/src"],
 
-      "@gatewaystack/explicabl-core": ["packages/explicabl-core/dist"],
-      "@gatewaystack/explicabl": ["packages/explicabl/dist"],
+      "@gatewaystack/explicabl-core": ["packages/explicabl-core/src"],
+      "@gatewaystack/explicabl": ["packages/explicabl/src"],
 
-      "@gatewaystack/request-context": ["packages/request-context/dist"],
-      "@gatewaystack/integrations": ["packages/integrations/dist"],
-      "@gatewaystack/compat": ["packages/compat/dist"]
+      "@gatewaystack/request-context": ["packages/request-context/src"],
+      "@gatewaystack/integrations": ["packages/integrations/src"],
+      "@gatewaystack/compat": ["packages/compat/src"]
     }
   },
   "exclude": ["dist", "build", "node_modules"]
