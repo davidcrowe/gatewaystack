@@ -1,4 +1,4 @@
-# Gatewaystack — Agentic Control Plane for User-Scoped AI Governance
+# GatewayStack — Agentic Control Plane for User-Scoped AI Governance
 
 An open-source control plane that makes AI agents **enterprise-ready** by enforcing user-scoped identity, policy, and audit trails on every model call.
 
@@ -18,6 +18,8 @@ Drop it between AI clients (ChatGPT, Claude, MCP) and your backend. It validates
 
 Every AI request flows through six governance checkpoints:
 > **Identified → Transformed → Validated → Constrained → Routed → Audited**
+
+---
 
 ### The Three-Party Problem
 
@@ -44,6 +46,8 @@ This instability across user ↔ LLM ↔ backend is what Gatewaystack calls the 
 
 It shows up in two directions:
 
+---
+
 ### Direction 1: Users accessing their own data via AI
 *"How do I let ChatGPT read **my** calendar without exposing **everyone's** calendar?"*
 
@@ -65,6 +69,8 @@ app.get('/calendar', async (req, res) => {
 ```
 
 The gateway validates the OAuth token, extracts the user identity, and injects `X-User-Id` — so your backend can safely filter data per-user.
+
+---
 
 ### Direction 2: Enterprises controlling who can use which models and tools
 *"How do I ensure only **licensed doctors** use medical models, only **analysts** access financial data, and **contractors** can't send sensitive prompts?"*
@@ -109,6 +115,8 @@ app.post('/chat', async (req, res) => {
 ```
 
 The gateway enforces role + scope checks **before** forwarding to your backend. If a nurse tries to use `gpt-4-medical`, they get `403 Forbidden`.
+
+---
 
 ### Why Both Directions Matter
 
@@ -164,6 +172,7 @@ Gatewaystack is composed of modular packages that can run **standalone** or as a
 
 - `@gatewaystack/request-context`, `@gatewaystack/integrations`, and additional `*-core` folders – Shared types, RequestContext helpers, and staging areas for upcoming connectors as the Agentic Control Plane expands.
 
+---
 
 ### Reference server (apps/gateway-server)
 
@@ -182,9 +191,12 @@ Toggles worth noting:
 - `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX` tune limitabl without editing TypeScript.
 - `.env.example` plus `apps/gateway-server/.env.example` enumerate every knob.
 
+---
 ### Admin UI (apps/admin-ui)
 
 `npm run dev:admin` launches a tiny Vite/React panel (`apps/admin-ui/src/App.tsx`) that fetches `/health` and renders the JSON so you can keep gateway status visible while iterating.
+
+---
 
 ### Core governance layers
 
@@ -199,10 +211,6 @@ Every request flows through the same six-layer composable pipeline:
 | **proxyabl**     | 🧩     | **Execution Control & Identity-Aware Routing** — routes calls to the right tool/model backend, injects verified identity, and presents OAuth/PRM metadata. |
 | **explicabl**    | ⚪     | **Accountability & Runtime Audit** — emits immutable, correlated events to your SIEM/observability stack and exposes health/conformance endpoints. |
 
-> **🔓 Works with Any Identity Provider**  
-> Gatewaystack is IdP-agnostic. It works with any OAuth 2.1 / OIDC provider that issues RS256 JWTs: Auth0, Okta, Entra ID (Azure AD), Keycloak, Google OAuth, or custom implementations.  
-> Auth0 examples are provided for quick setup—the same patterns apply to all providers. See [Identity Provider Requirements](#identity-provider-requirements) for details.
-
 Drop it between AI clients and your backend — no SDK modification needed. Handles **RS256 JWTs**, audience/issuer checks, per-tool scopes, role-based policies, and optional **DCR** client promotion.
 
 > **Conformance summary**  
@@ -211,6 +219,8 @@ Drop it between AI clients and your backend — no SDK modification needed. Hand
 > - ✅ Scope allowlist / deny-by-default  
 > - ✅ Expiry handling  
 > - ✅ Health & protected resource endpoints  
+
+---
 
 ### Quick links
 
@@ -284,20 +294,16 @@ A SaaS platform offers AI features across free, pro, and enterprise tiers. Today
 **Identity Providers (Auth0, Okta, Cognito, Entra ID)**  
 Handle login and token minting, but stop at the edge of your app. They don't understand model calls, tools, or which provider a request is going to — and they don't enforce user identity inside the AI gateway.
 
----
-
 **API Gateways and Service Meshes (Kong, Apigee, AWS API Gateway, Istio, Envoy)**  
 Great at path/method-level auth and rate limiting, but they treat LLMs like any other HTTP backend. **You can build AI governance on top of them** (Kong plugins, Istio policies, Lambda authorizers), **but it requires 100+ hours of custom development** to replicate what Gatewaystack provides out-of-the-box: user-scoped identity normalization, per-tool scope enforcement, pre-flight cost checks, Apps SDK / MCP compliance, and AI-specific audit trails.
-
----
 
 **Cloud AI Gateways (Cloudflare AI Gateway, Azure OpenAI + API Management, Vertex AI, Bedrock Guardrails)**  
 Focus on provider routing, quota, and safety filters at the tenant or API key level. User identity is usually out-of-band or left to the application.
 
----
-
 **Hand-Rolled Middleware**  
 Many teams glue together JWT validation, headers, and logging inside their app or a thin Node/Go proxy. It works... until you need to support multiple agents, providers, tenants, and audit/regulatory requirements.
+
+---
 
 **Gatewaystack is different:**
 - **User-scoped by default** — every request is tied to a verified user, not a shared key
@@ -322,6 +328,8 @@ To get user-scoped AI governance with Kong, you'd need to:
 **With Gatewaystack:** Configure `.env` file, deploy, done. (2 hours)
 
 You can still run Gatewaystack alongside traditional API gateways — it's the **user-scoped identity and governance slice** of your AI stack.
+
+---
 
 ### GatewayStack vs Traditional API Gateways
 
@@ -355,6 +363,8 @@ curl -s -X POST http://localhost:5051/mint \
 
 See `demos/mcp-server/README.md` and `demos/chatgpt-connector/README.md` for the curl walkthroughs and troubleshooting tips.
 
+---
+
 ### Demo mode env
 
 Set these in `apps/gateway-server/.env` to enable local demos without Auth0:
@@ -374,7 +384,7 @@ With demo mode on you can run `npm run demo:*`, call `/protected/ping`, exercise
 
 Choose your path:
 
-**Local Development (10 min)** → Run demos without Auth0  
+**Quickstart (10 min)** → Run local demos without Auth0  
 **Production Setup (30 min)** → Connect to Auth0/Okta + ChatGPT/Claude  
 **Deployment** → Cloud Run, Docker, Kubernetes
 
@@ -428,6 +438,8 @@ Gatewaystack requires an OAuth 2.1 / OIDC provider that issues **RS256 JWTs**.
 | **Custom scopes** | For authorization (`tool:read`, `tool:write`) | Configure in your IdP's API settings |
 | **OAuth 2.1 + PKCE** | Required for ChatGPT Apps SDK / MCP flows | Auth0, Okta, Entra ID |
 
+---
+
 #### Supported Providers
 
 | Provider | Status | Notes |
@@ -441,6 +453,8 @@ Gatewaystack requires an OAuth 2.1 / OIDC provider that issues **RS256 JWTs**.
 
 **Need help with your IdP?** Open a [GitHub Discussion](https://github.com/davidcrowe/gatewaystack/discussions).
 
+---
+
 #### Create an API (Auth0 Dashboard → Applications → APIs)
 
 * **Name:** `Gateway API`
@@ -448,14 +462,20 @@ Gatewaystack requires an OAuth 2.1 / OIDC provider that issues **RS256 JWTs**.
 * **Signing algorithm:** `RS256`
 * Enable **RBAC** and **Add Permissions in the Access Token**
 
+---
+
 #### Define permissions/scopes (examples)
 
 * `tool:read`
 * `tool:write`
 
+---
+
 #### Create an Application
 
 Create a **Regular Web App** or **SPA** to obtain tokens during development.
+
+---
 
 #### Well-Known Issuer
 
@@ -465,6 +485,8 @@ Your issuer will be:
 https://<TENANT>.region.auth0.com/
 ```
 
+---
+
 #### (Optional) Management API client (for DCR webhook)
 
 Create a **Machine-to-Machine** application with scopes:
@@ -473,11 +495,14 @@ Create a **Machine-to-Machine** application with scopes:
 read:clients update:clients read:connections update:connections read:logs
 ```
 
+---
+
 #### Get a dev access token
 
 * From your app’s Auth0 **Test** tab or via a quick PKCE flow.
 * Ensure the token’s **audience** matches your API identifier and includes the scopes you want to test (e.g., `tool:read`).
 
+---
 ### Auth0 Post-Login Action for ChatGPT connectors
 > **⚠️ Auth0-Specific Feature**  
 > This section only applies if you're using Auth0 + ChatGPT Apps SDK.  
@@ -522,6 +547,8 @@ See `apps/gateway-server/.env.example` for the full reference, including:
 - Tool scopes (`TOOL_SCOPES_JSON`)
 - DCR webhook (`MGMT_*`, `LOG_WEBHOOK_SECRET`)
 
+---
+
 ### Start the Test Backends (Echo Servers)
 
 These help prove proxy + header injection:
@@ -538,6 +565,8 @@ The echo server simply returns the headers, query, and body it receives. Combine
 
 Need a fake tool backend instead of an echo? Run `tsx tools/mock-tools-server/index.ts` to spin up JSON handlers (on :9090 by default) that mimic `generateDreamSummary`, `chatWithEmbeddingsv3`, etc. for end-to-end proxy tests.
 
+---
+
 ### Run the Gateway (dev)
 
 From the repo root:
@@ -551,6 +580,8 @@ npm run dev:admin    # apps/admin-ui
 - `npm run dev` starts the gateway and Admin UI together.
 - `npm run dev:server` starts the Express gateway only.
 - `npm run dev:admin` starts the Admin UI, which is primarily used to visualize `/health` and related outputs.
+
+---
 
 ### Health & Basic Smoke Tests
 
@@ -646,6 +677,8 @@ Trigger a client registration event (or simulate via Auth0 log events).
 
 Check `/health/auth0` — you should see a **recent webhook last-seen** timestamp and successful management calls in your logs.
 
+---
+
 ### Troubleshooting
 
 > **Using Auth0 + ChatGPT?** For Auth0-specific issues (Post-Login Actions, JWE vs JWS tokens, scopes not showing up, etc.), see `docs/auth0/chatgpt-post-login-action.md` → “Troubleshooting checklist”.
@@ -668,6 +701,8 @@ Check `/health/auth0` — you should see a **recent webhook last-seen** timestam
 **Rate limit never triggers**
 
 * Lower `RATE_LIMIT_MAX` and ensure identifier (user/tenant) is parsed from the token’s `sub` / `org_id`
+
+---
 
 ### Production Checklist
 
@@ -734,6 +769,8 @@ docker run -p 8080:8080 \
 
 **See:** `docs/deployment/docker.md` for Docker Compose, Kubernetes manifests, etc.
 
+---
+
 ### Other Platforms
 
 | Platform | Difficulty | Guide |
@@ -745,6 +782,8 @@ docker run -p 8080:8080 \
 | **Kubernetes** | Hard | `docs/deployment/kubernetes.md` |
 
 **Air-gapped / on-prem deployments:** Fully supported (Docker + self-hosted)
+
+---
 
 ### CI/CD
 
