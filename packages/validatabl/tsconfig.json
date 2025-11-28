@@ -1,8 +1,14 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "../../dist/validatabl",
-    "composite": true
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+
+    // 👇 override these for this Node library
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+    // (you could also use "node" here; "NodeNext" is fine with ESNext modules)
   },
   "include": ["src"],
   "references": [

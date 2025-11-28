@@ -3,12 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "packageManager": "npm@10.8.2",
   "workspaces": ["apps/*", "packages/*", "tools/*", "demos/*"],
   "scripts": {
     "bootstrap": "npm i",
     "clean": "git clean -fdX **/dist || true",
-    "build": "tsc -b",
+    "build": "tsc -b packages/request-context packages/identifiabl-core packages/identifiabl packages/transformabl-core packages/transformabl packages/validatabl-core packages/validatabl packages/limitabl packages/proxyabl packages/explicabl packages/compat packages/integrations apps/gateway-server apps/admin-ui",
     "dev:server": "npm --workspace apps/gateway-server run dev",
     "dev:admin": "npm --workspace apps/admin-ui run dev",
     "dev": "npm run dev:server",

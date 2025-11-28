@@ -50,32 +50,11 @@ It shows up in two directions:
 
 ---
 
-### Direction 1: Users accessing their own data via AI
-*"How do I let ChatGPT read **my** calendar without exposing **everyone's** calendar?"*
 
-**Without Gatewaystack:**
-```typescript
-app.get('/calendar', async (_req, res) => {
-  const events = await getAllEvents(); // ❌ Everyone sees everything
-  res.json(events);
-});
-```
-
-**With Gatewaystack:**
-```typescript
-app.get('/calendar', async (req, res) => {
-  const userId = req.headers['x-user-id']; // ✅ Verified by gateway
-  const events = await getUserEvents(userId);
-  res.json(events);
-});
-```
-
-The gateway validates the OAuth token, extracts the user identity, and injects `X-User-Id` — so your backend can safely filter data per-user.
-
----
-
-### Direction 2: Enterprises controlling who can use which models and tools
+### Direction 1: Enterprises controlling who can use which models and tools
 *"How do I ensure only **licensed doctors** use medical models, only **analysts** access financial data, and **contractors** can't send sensitive prompts?"*
+
+> user ↔ backend ↔ LLM
 
 **Without Gatewaystack:**
 ```typescript
@@ -117,6 +96,32 @@ app.post('/chat', async (req, res) => {
 ```
 
 The gateway enforces role + scope checks **before** forwarding to your backend. If a nurse tries to use `gpt-4-medical`, they get `403 Forbidden`.
+
+---
+
+### Direction 2: Users accessing their own data via AI
+*"How do I let ChatGPT read **my** calendar without exposing **everyone's** calendar?"*
+
+> user ↔ LLM ↔ backend
+
+**Without Gatewaystack:**
+```typescript
+app.get('/calendar', async (_req, res) => {
+  const events = await getAllEvents(); // ❌ Everyone sees everything
+  res.json(events);
+});
+```
+
+**With Gatewaystack:**
+```typescript
+app.get('/calendar', async (req, res) => {
+  const userId = req.headers['x-user-id']; // ✅ Verified by gateway
+  const events = await getUserEvents(userId);
+  res.json(events);
+});
+```
+
+The gateway validates the OAuth token, extracts the user identity, and injects `X-User-Id` — so your backend can safely filter data per-user.
 
 ---
 
