@@ -40,44 +40,26 @@ function buildIssuerPattern(issuer: string): RegExp {
  *  - Checks audience and issuer
  *  - Attaches the JWT payload to req.user
  */
-export function identifiabl(config: IdentifiablConfig): RequestHandler {
-  const issuerNoSlash = config.issuer.replace(/\/+$/, "");
-  const issuerPattern = buildIssuerPattern(config.issuer);
-  const audience = config.audience;
-  const jwksUri =
-    config.jwksUri || `${issuerNoSlash}/.well-known/jwks.json`;
+import { createIdentifiablVerifier } from "@gatewaystack/identifiabl-core";
 
-  const JWKS = createRemoteJWKSet(new URL(jwksUri));
+export function identifiabl(config: IdentifiablConfig): RequestHandler {
+  const verify = createIdentifiablVerifier(config);
 
   const middleware: RequestHandler = async (req: any, res, next) => {
-    try {
-      const auth = req.headers.authorization || "";
-      const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    const auth = req.headers.authorization || "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
 
-      if (!token) {
-        return res.status(401).json({ error: "missing_bearer" });
-      }
-
-      // Verify signature & audience
-      const { payload } = await jwtVerify(token, JWKS, { audience });
-
-      // Enforce expected issuer (with or without trailing slash)
-      const iss = String(payload.iss || "");
-      if (!issuerPattern.test(iss)) {
-        return res.status(401).json({
-          error: "invalid_token",
-          detail: `unexpected "iss" claim value: ${iss}`,
-        });
-      }
-
-      // Attach identity to the request
-      req.user = payload;
-      return next();
-    } catch (e: any) {
-      return res
-        .status(401)
-        .json({ error: "invalid_token", detail: e?.message });
+    if (!token) {
+      return res.status(401).json({ error: "missing_bearer" });
     }
+
+    const result = await verify(token);
+    if (!result.ok) {
+      return res.status(401).json(result);
+    }
+
+    req.user = result.identity;
+    return next();
   };
 
   return middleware;

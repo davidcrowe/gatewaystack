@@ -898,8 +898,6 @@ curl -i -H "Authorization: Bearer $TOKEN" https://<YOUR_GATEWAY>/writer-only
 - 🐛 Report bugs via [GitHub Issues](https://github.com/davidcrowe/gatewaystack/issues)
 - ⭐ Star the repo if this helps you!
 
-## License
 
-MIT License - see [LICENSE](LICENSE) for details.
 
 Built by [reducibl applied AI studio](https://reducibl.com)

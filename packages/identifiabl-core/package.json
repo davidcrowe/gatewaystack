@@ -1,10 +1,23 @@
 {
-  "name": "@gatewaystack/identifiabl-core",
+  "name": "identifiabl",
   "version": "0.1.0",
+  "description": "RS256 JWT verification and identity mapping for GatewayStack.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/davidcrowe/gatewaystack.git",
+    "directory": "packages/identifiabl-core"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
   "dependencies": {
-    "@gatewaystack/request-context": "0.1.0"  
+    "jose": "^6.1.0"
   }
 }
-

@@ -4,10 +4,33 @@ import {
   type JWTPayload,
 } from "jose";
 
-import type {
-  GatewayIdentity,
-  IdentitySource,
-} from "@gatewaystack/request-context";
+// import type {
+//   GatewayIdentity,
+//   IdentitySource,
+// } from "@gatewaystack/request-context";
+
+// remove this:
+// import type { GatewayIdentity, IdentitySource } from "@gatewaystack/request-context";
+
+export type IdentitySource =
+  | "auth0"
+  | "stytch"
+  | "cognito"
+  | "custom"
+  | string;
+
+export interface GatewayIdentity {
+  sub: string;
+  issuer: string;
+  tenantId?: string;
+  email?: string;
+  name?: string;
+  roles?: string[];
+  scopes?: string[];
+  plan?: string;
+  source: IdentitySource;
+  raw: Record<string, unknown>;
+}
 
 export interface IdentifiablCoreConfig {
   issuer: string;
@@ -126,7 +149,11 @@ export function createIdentifiablVerifier(
 
   return async (token: string): Promise<VerifyResult> => {
     try {
-      const { payload } = await jwtVerify(token, JWKS, { audience });
+      const { payload } = await jwtVerify(token, JWKS, {
+        audience,
+        algorithms: ["RS256"],
+        clockTolerance: "60s"
+      });
 
       const iss = String(payload.iss || "");
       if (!issuerPattern.test(iss)) {
