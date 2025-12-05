@@ -15,17 +15,6 @@ import { testEchoRoutes } from "./routes/testEcho";
 
 import rateLimit from "express-rate-limit";
 
-/**
- * GatewayStack reference server
- *
- * This app wires together all 6 governance layers:
- *  1) Identifiabl   – authentication / identity (JWT → req.user)
- *  2) Transformabl  – request transformation (PII redaction, classification)
- *  3) Validatabl    – scopes, RBAC, protected resource metadata
- *  4) Limitabl      – per-identity rate limiting / usage control
- *  5) Proxyabl      – provider routing, tool / MCP gateway
- *  6) Explicabl     – health, logging, audit, webhooks
- */
 export function buildApp(env: NodeJS.ProcessEnv) {
   // -----------------------------
   // Boot & configuration
@@ -36,17 +25,26 @@ export function buildApp(env: NodeJS.ProcessEnv) {
   const DEMO = env.DEMO_MODE === "true";
 
   // OIDC / OAuth config (used by Identifiabl + Validatabl)
-  const OAUTH_ISSUER = (DEMO ? env.OAUTH_ISSUER_DEMO : env.OAUTH_ISSUER) || "";
-  const OAUTH_AUDIENCE = (DEMO ? env.OAUTH_AUDIENCE_DEMO : env.OAUTH_AUDIENCE)!;
-  const OAUTH_JWKS_URI = (DEMO ? env.OAUTH_JWKS_URI_DEMO : env.OAUTH_JWKS_URI) || env.JWKS_URI_FALLBACK ||"";
-  const OAUTH_SCOPES = ((DEMO ? env.OAUTH_SCOPES_DEMO : env.OAUTH_SCOPES) || "openid email profile")
+  const OAUTH_ISSUER =
+    (DEMO ? env.OAUTH_ISSUER_DEMO : env.OAUTH_ISSUER) || "";
+  const OAUTH_AUDIENCE =
+    (DEMO ? env.OAUTH_AUDIENCE_DEMO : env.OAUTH_AUDIENCE) || "";
+  const OAUTH_JWKS_URI =
+    (DEMO ? env.OAUTH_JWKS_URI_DEMO : env.OAUTH_JWKS_URI) ||
+    env.JWKS_URI_FALLBACK ||
+    "";
+  const OAUTH_SCOPES = (
+    (DEMO ? env.OAUTH_SCOPES_DEMO : env.OAUTH_SCOPES) ||
+    "openid email profile"
+  )
     .trim()
     .split(/\s+/);
 
+  // 🔐 Avoid logging sensitive values directly
   console.log("[boot] DEMO_MODE=%s", DEMO);
-  console.log("[boot] OAUTH_ISSUER=%s", OAUTH_ISSUER);
-  console.log("[boot] OAUTH_AUDIENCE=%s", OAUTH_AUDIENCE);
-  console.log("[boot] OAUTH_JWKS_URI=%s", OAUTH_JWKS_URI);
+  console.log("[boot] OAUTH_ISSUER_SET=%s", Boolean(OAUTH_ISSUER));
+  console.log("[boot] OAUTH_AUDIENCE_SET=%s", Boolean(OAUTH_AUDIENCE));
+  console.log("[boot] OAUTH_JWKS_URI_SET=%s", Boolean(OAUTH_JWKS_URI));
 
   // Fail fast in demo if required vars are missing
   if (DEMO && (!OAUTH_ISSUER || !OAUTH_AUDIENCE)) {

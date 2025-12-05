@@ -2,6 +2,8 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { randomUUID, createHmac } from "crypto";
+import rateLimit from "express-rate-limit";
+
 
 // ---------- Config --------
 const FUNCTIONS_BASE = (process.env.FUNCTIONS_BASE ??
@@ -28,6 +30,59 @@ const OAUTH_SCOPES = (process.env.OAUTH_SCOPES ?? "openid email profile").trim()
 
 const GATEWAY_HMAC_SECRET = process.env.GATEWAY_HMAC_SECRET || "dev-only-change-me";
 const APP_ORIGIN = process.env.APP_ORIGIN || "*";
+
+// --------- Rate limiting (DoS protection) ---------
+const RATE_WINDOW_MS = +(process.env.RATE_WINDOW_MS || 60_000); // 1 minute
+const TOOL_MAX_PER_WINDOW = +(process.env.TOOL_MAX_PER_WINDOW || 60);
+const MCP_MAX_PER_WINDOW  = +(process.env.MCP_MAX_PER_WINDOW || 60);
+const WEBHOOK_MAX_PER_WINDOW = +(process.env.WEBHOOK_MAX_PER_WINDOW || 30);
+const DISCOVERY_MAX_PER_WINDOW = +(process.env.DISCOVERY_MAX_PER_WINDOW || 120);
+
+// Loosen the param type to avoid cross-package @types/express mismatch
+const keyFromReq = (req: any): string => {
+  const xf = req.get?.("x-forwarded-for");
+  if (typeof xf === "string" && xf.length > 0) {
+    return xf.split(",")[0].trim();
+  }
+  return req.ip || "unknown";
+};
+
+
+// General limiter for tool calls (REST + MCP)
+const toolLimiter = rateLimit({
+  windowMs: RATE_WINDOW_MS,
+  max: TOOL_MAX_PER_WINDOW,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyFromReq,
+});
+
+// Slightly stricter/different one for MCP if you want (or reuse toolLimiter)
+const mcpLimiter = rateLimit({
+  windowMs: RATE_WINDOW_MS,
+  max: MCP_MAX_PER_WINDOW,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyFromReq,
+});
+
+// Auth0 log webhook limiter – low volume but protects you if someone guesses the URL
+const webhookLimiter = rateLimit({
+  windowMs: RATE_WINDOW_MS,
+  max: WEBHOOK_MAX_PER_WINDOW,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyFromReq,
+});
+
+// New: discovery limiter for well-known endpoints & metadata
+const discoveryLimiter = rateLimit({
+  windowMs: RATE_WINDOW_MS,
+  max: DISCOVERY_MAX_PER_WINDOW,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyFromReq,
+});
 
 // Map tool -> scopes it requires
 // Example JSON: {"chatWithEmbeddingsv3":["app.write"],"listEvents":["app.read"]}
@@ -66,10 +121,10 @@ const REQUIRED_SCOPES = Array.from(new Set(Object.values(TOOL_SCOPES).flat()));
 function logCfg() {
   console.log("[cfg]", {
     OAUTH_ISSUER,
-    OAUTH_AUDIENCE,
-    JWKS_URI_FALLBACK,
+    OAUTH_AUDIENCE: OAUTH_AUDIENCE ? "[set]" : null,
+    JWKS_URI_FALLBACK: JWKS_URI_FALLBACK ? "[set]" : null,
     FUNCTIONS_BASE,
-    APP_ORIGIN
+    APP_ORIGIN,
   });
 }
 logCfg();
@@ -88,11 +143,19 @@ function logAuthShape(prefix: string, req: Request) {
     hasAuth, tokenShape, len, req.path, req.method);
 }
 
+const DEBUG_AUTH = process.env.DEBUG_AUTH === "1";
+
 function logJwtClaims(prefix: string, token: string) {
+  if (!DEBUG_AUTH) return;
   const dbg = decodeJwtUnsafe(token);
-  console.log(`[auth:${prefix}] iss=%s aud=%s scope=%s perms=%s`,
-    dbg?.iss, JSON.stringify(dbg?.aud), dbg?.scope, JSON.stringify(dbg?.permissions));
+  console.log(`[auth:${prefix}] iss=%s aud_count=%s has_scope=%s has_permissions=%s`,
+    dbg?.iss,
+    Array.isArray(dbg?.aud) ? dbg.aud.length : (dbg?.aud ? 1 : 0),
+    Boolean(dbg?.scope),
+    Array.isArray(dbg?.permissions) && dbg.permissions.length > 0
+  );
 }
+
 
 function b64urlDecodeToJson(s: string) {
   try {
@@ -126,6 +189,26 @@ function requireScopes(have: string[], need: string[]) {
     err.code = "INSUFFICIENT_SCOPE";
     throw err;
   }
+}
+
+function sanitizeFunctionName(name: string): string {
+  // Only allow normal Cloud Function-style names: letters, digits, dash, underscore
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    const err: any = new Error("INVALID_TOOL_NAME");
+    err.status = 400;
+    err.code = "INVALID_TOOL_NAME";
+    throw err;
+  }
+
+  // Optional but recommended: require the tool to be in TOOL_SCOPES
+  if (!TOOL_SCOPES[name]) {
+    const err: any = new Error(`UNKNOWN_TOOL:${name}`);
+    err.status = 404;
+    err.code = "UNKNOWN_TOOL";
+    throw err;
+  }
+
+  return name;
 }
 
 async function subjectToUid(sub: string, _email?: string): Promise<string> {
@@ -414,16 +497,16 @@ async function handleMcp(req: Request, res: Response) {
     return;
   }
 
-  // protected: call a tool
+    // protected: call a tool
   if (rpc.method === "tools/call") {
-    const name = rpc.params?.name;
+    const nameRaw = rpc.params?.name;
     const args = rpc.params?.arguments ?? {};
 
-    console.log("[mcp] tools/call name=%s", name);
+    console.log("[mcp] tools/call name=%s", nameRaw);
     logAuthShape("mcp.tools/call", req);
 
-    if (typeof name !== "string" || !TOOL_SCOPES[name]) {
-      res.status(404).json(jsonRpcError(rpc.id ?? null, -32601, `Unknown tool: ${name}`));
+    if (typeof nameRaw !== "string" || !TOOL_SCOPES[nameRaw]) {
+      res.status(404).json(jsonRpcError(rpc.id ?? null, -32601, `Unknown tool: ${nameRaw}`));
       return;
     }
 
@@ -433,16 +516,34 @@ async function handleMcp(req: Request, res: Response) {
       if (!hasAuth || tokenShape !== "jwt") {
         const www = buildWwwAuthenticate(req) + ", error=\"invalid_token\"";
         res.setHeader("WWW-Authenticate", www);
-        console.warn("[mcp] tools/call → 401 (non-JWT token)", { hasAuth, tokenShape, name });
+        console.warn("[mcp] tools/call → 401 (non-JWT token)", { hasAuth, tokenShape, name: nameRaw });
         res.status(401).json(jsonRpcError(rpc.id ?? null, -32001, "Unauthorized"));
         return;
       }
     }
 
+    // ✅ Sanitize & validate the function name before using it anywhere security-sensitive
+    let toolName: string;
+    try {
+      toolName = sanitizeFunctionName(nameRaw);
+    } catch (e: any) {
+      const status = Number(e?.status) || 400;
+      res.status(status).json(
+        jsonRpcError(
+          rpc.id ?? null,
+          -32602,
+          e?.message || "Invalid tool name",
+          { code: e?.code || "INVALID_TOOL_NAME" }
+        )
+      );
+      return;
+    }
+
     let uid: string, gatewaySig: string;
     try {
-      const verified = await verifyBearerAndScopes(req, name);
-      uid = verified.uid; gatewaySig = verified.gatewaySig;
+      const verified = await verifyBearerAndScopes(req, toolName);
+      uid = verified.uid;
+      gatewaySig = verified.gatewaySig;
     } catch (e: any) {
       if (e?.www) res.setHeader("WWW-Authenticate", e.www);
       else res.setHeader("WWW-Authenticate", buildWwwAuthenticate(req));
@@ -452,7 +553,7 @@ async function handleMcp(req: Request, res: Response) {
     }
 
     const requestId = req.header("x-request-id") || randomUUID();
-    const url = `${FUNCTIONS_BASE}/${name}`;
+    const url = `${FUNCTIONS_BASE}/${toolName}`;
     const r = await fetch(url, {
       method: "POST",
       headers: {
@@ -482,6 +583,7 @@ async function handleMcp(req: Request, res: Response) {
     return;
   }
 
+
   res.status(400).json(jsonRpcError(rpc.id ?? null, -32601, `Method not found: ${rpc.method}`));
 }
 
@@ -499,8 +601,8 @@ export async function wellKnownOauthProtectedResource(req: Request, res: Respons
   });
   console.log("[wk.cfg]", {
     issuer: OAUTH_ISSUER,
-    audience: OAUTH_AUDIENCE || null,
-    jwks_uri_fallback: JWKS_URI_FALLBACK,
+    audience: OAUTH_AUDIENCE ? "[set]" : null,
+    jwks_uri_fallback: JWKS_URI_FALLBACK ? "[set]" : null,
     required_scopes: REQUIRED_SCOPES,
   });
 
@@ -609,7 +711,7 @@ export async function toolGatewayImpl(req: Request, res: Response): Promise<void
     return;
   }
 
-  const requestId = req.header("x-request-id") || crypto.randomUUID();
+  const requestId = req.header("x-request-id") || randomUUID();
   const started = Date.now();
 
   try {
@@ -658,11 +760,25 @@ export async function toolGatewayImpl(req: Request, res: Response): Promise<void
     const permissions = Array.isArray((payload as any).permissions) ? ((payload as any).permissions as string[]) : [];
     const scopes = Array.from(new Set([...scopeList, ...permissions]));
 
-    const name = toolNameFromPath(req.path);
+        let name = toolNameFromPath(req.path);
     if (!name) {
       res.status(400).json({ ok: false, error: { code: "NO_TOOL", message: "Missing tool name" }, requestId });
       return;
     }
+
+    // ✅ Sanitize & validate the function name before using it in the URL
+    try {
+      name = sanitizeFunctionName(name);
+    } catch (e: any) {
+      const status = Number(e?.status) || 400;
+      res.status(status).json({
+        ok: false,
+        error: { code: e?.code || "INVALID_TOOL_NAME", message: e?.message || "Invalid tool name" },
+        requestId
+      });
+      return;
+    }
+
     const need = TOOL_SCOPES[name] || [];
     if (need.length) requireScopes(scopes, need);
 
@@ -719,42 +835,85 @@ const MGMT_CLIENT_SECRET = process.env.MGMT_CLIENT_SECRET!;
 const LOG_WEBHOOK_SECRET = process.env.LOG_WEBHOOK_SECRET || "dev-change-me";
 const GOOGLE_CONNECTION_NAME = process.env.GOOGLE_CONNECTION_NAME || "google-oauth2";
 
+function sanitizeMgmtClientId(id: string): string {
+  if (typeof id !== "string") {
+    throw new Error("invalid_client_id_type");
+  }
+  // Auth0 client_ids are URL-safe base64-ish: letters, digits, - and _
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+    throw new Error("invalid_client_id_format");
+  }
+  return id;
+}
+
+function auth0MgmtUrl(path: string): string {
+  const domain = (MGMT_DOMAIN || "").trim();
+  if (!domain) {
+    throw new Error("MGMT_DOMAIN_not_set");
+  }
+  // Defensive: only allow hostname-style content in domain
+  if (!/^[a-zA-Z0-9.-]+$/.test(domain)) {
+    throw new Error(`invalid_MGMT_DOMAIN:${domain}`);
+  }
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `https://${domain}${normalizedPath}`;
+}
+
 type OAuthTokenRes = { access_token: string; token_type?: string; expires_in?: number };
 
 async function getMgmtToken(): Promise<string> {
-  const r = await fetch(`https://${MGMT_DOMAIN}/oauth/token`, {
+  const r = await fetch(auth0MgmtUrl("/oauth/token"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       grant_type: "client_credentials",
       client_id: MGMT_CLIENT_ID,
       client_secret: MGMT_CLIENT_SECRET,
-      audience: `https://${MGMT_DOMAIN}/api/v2/`
+      audience: auth0MgmtUrl("/api/v2/")
     })
   } as any);
-  if (!r.ok) throw new Error(`mgmt_token_http_${r.status}`);
-  const j = (await r.json()) as OAuthTokenRes;   // <-- typed
-  if (!j?.access_token) throw new Error("mgmt_token_missing_access_token");
+
+  if (!r.ok) {
+    throw new Error(`mgmt_token_http_${r.status}`);
+  }
+
+  const j = (await r.json()) as OAuthTokenRes;
+  if (!j?.access_token) {
+    throw new Error("mgmt_token_missing_access_token");
+  }
   return j.access_token;
 }
-
 
 // Helper: patch client → first-party + public + grants
 async function promoteClient(mgmtToken: string, clientId: string) {
   const patchBody = {
-    app_type: "regular_web",                // or "native" if you prefer
+    app_type: "regular_web",
     is_first_party: true,
     token_endpoint_auth_method: "none",
     grant_types: ["authorization_code", "refresh_token"]
   };
-  const r = await fetch(`https://${MGMT_DOMAIN}/api/v2/clients/${clientId}`, {
-    method: "PATCH",
-    headers: { "content-type": "application/json", authorization: `Bearer ${mgmtToken}` },
-    body: JSON.stringify(patchBody)
-  } as any);
+
+  const safeClientId = sanitizeMgmtClientId(clientId);
+
+  const r = await fetch(
+    auth0MgmtUrl(`/api/v2/clients/${encodeURIComponent(safeClientId)}`),
+    {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${mgmtToken}`
+      },
+      body: JSON.stringify(patchBody)
+    } as any
+  );
+
   if (!r.ok) {
-    const txt = await r.text();
-    throw new Error(`promote_http_${r.status}:${txt}`);
+    // Don't dump the body; just log status + client_id suffix
+    console.error("[promoteClient:error]", {
+      status: r.status,
+      client_id_suffix: safeClientId.slice(-5),
+    });
+    throw new Error(`promote_http_${r.status}`);
   }
 }
 
@@ -778,8 +937,11 @@ async function enableGoogleForClient(mgmtToken: string, clientId: string) {
     body: JSON.stringify({ enabled_clients: Array.from(enabled) })
   } as any);
   if (!rp.ok) {
-    const txt = await rp.text();
-    throw new Error(`conn_patch_http_${rp.status}:${txt}`);
+    console.error("[enableGoogleForClient:error]", {
+      status: rp.status,
+      client_id_suffix: clientId.slice(-5),
+    });
+    throw new Error(`conn_patch_http_${rp.status}`);
   }
 }
 
@@ -826,8 +988,7 @@ async function findNewestChatGPTClientId(mgmtToken: string): Promise<string | nu
     "?is_global=false&per_page=10&sort=created_at:-1&fields=client_id,name,created_at,app_type,grant_types,token_endpoint_auth_method&include_fields=true";
   const r = await fetch(url, { headers: { authorization: `Bearer ${mgmtToken}` } } as any);
   if (!r.ok) {
-    const txt = await r.text();
-    console.warn("[dcr] clients list failed", r.status, txt);
+    console.warn("[dcr] clients list failed", { status: r.status });
     return null;
   }
   const arr = (await r.json()) as Array<any>;
@@ -914,23 +1075,6 @@ export async function auth0LogWebhook(req: Request, res: Response) {
     try { parsed = JSON.parse(parsed); } catch { /* ignore */ }
   }
   const events: any[] = Array.isArray(parsed) ? (parsed as any[]) : [parsed as any];
-
-
-  // DEBUG: show shape after unwrap so we can see fields
-  try {
-    const sample = (events || []).slice(0, 3).map((ev: any) => {
-      const e = unwrap(ev);
-      return {
-        type: e?.type,
-        desc: e?.description,
-        path: evtPath(e) || undefined,
-        method: e?.details?.request?.method || e?.http?.method,
-        hasRespClientId: !!e?.details?.response?.body?.client_id
-      };
-    });
-    console.log("[webhook:sample]", sample);
-  } catch { /* ignore */ }
-
   const dcrEvents = events.filter(isDcrEventRaw);
 
   if (dcrEvents.length === 0) {
@@ -977,97 +1121,206 @@ export async function auth0LogWebhook(req: Request, res: Response) {
     }
     res.status(200).json({ ok: true, promoted: dcrEvents.length });
   } catch (e: any) {
-    console.error("[dcr:error]", e?.message || e);
-    res.status(500).json({ ok: false, error: e?.message || String(e) });
+    console.error("[dcr:error]", { message: e?.message || String(e) });
+    res.status(500).json({ ok: false, error: "dcr_failed" });
   }
+
 }
 
-// ---- Express Router wrapper: preserves your exact paths/handlers ----
 // ---- Express Router wrapper: preserves your exact paths/handlers ----
 export const toolGatewayRouter = Router();
 
 // ===== Simple authenticated proxy with user injection =====
-const PROXY_TARGET = process.env.PROXY_TARGET || "http://127.0.0.1:3333";             // e.g. "http://localhost:3333"
-const PROXY_PREFIX = process.env.PROXY_PREFIX || "/proxy";       // e.g. "/proxy"
-const PROXY_INJECT_HEADER = process.env.PROXY_INJECT_HEADER || "";// e.g. "X-User-Id"
-const PROXY_INJECT_QUERY  = process.env.PROXY_INJECT_QUERY  || "";// e.g. "userId"
+const PROXY_TARGET = process.env.PROXY_TARGET || "http://127.0.0.1:3333"; // e.g. "http://localhost:3333"
+const PROXY_PREFIX = process.env.PROXY_PREFIX || "/proxy";               // e.g. "/proxy"
+const PROXY_INJECT_HEADER = process.env.PROXY_INJECT_HEADER || "";       // e.g. "X-User-Id"
+const PROXY_INJECT_QUERY  = process.env.PROXY_INJECT_QUERY  || "";       // e.g. "userId"
 
-if (PROXY_TARGET) {
+// Parse and validate PROXY_TARGET once to avoid SSRF-style host smuggling
+const PROXY_TARGET_URL: URL | null = (() => {
+  if (!PROXY_TARGET) return null;
+  try {
+    const u = new URL(PROXY_TARGET);
+    if (!/^https?:$/.test(u.protocol)) {
+      console.error("[proxy] PROXY_TARGET must be http or https");
+      return null;
+    }
+    if (!/^[a-zA-Z0-9.-]+$/.test(u.hostname)) {
+      console.error("[proxy] invalid PROXY_TARGET hostname:", u.hostname);
+      return null;
+    }
+    return u;
+  } catch (e) {
+    console.error("[proxy] invalid PROXY_TARGET:", PROXY_TARGET, e);
+    return null;
+  }
+})();
+
+// Comma-separated list of allowed paths, e.g. "/api,/health"
+const PROXY_ALLOWED_PATHS = (process.env.PROXY_ALLOWED_PATHS || "/")
+  .split(",")
+  .map(p => p.trim())
+  .filter(Boolean);
+
+/**
+ * Throws if the path is not in the allowlist.
+ * - Exact match: "/foo"
+ * - Prefix match: "/foo/" matches "/foo/bar", "/foo/baz", etc.
+ */
+function enforceProxyPathAllowlist(p: string): void {
+  // Ensure leading slash
+  const path = p.startsWith("/") ? p : `/${p}`;
+
+  const ok = PROXY_ALLOWED_PATHS.some(prefix => {
+    const pref = prefix.startsWith("/") ? prefix : `/${prefix}`;
+    if (pref.endsWith("/")) {
+      return path === pref.slice(0, -1) || path.startsWith(pref);
+    }
+    return path === pref || path.startsWith(pref + "/");
+  });
+
+  if (!ok) {
+    const err: any = new Error("PROXY_PATH_NOT_ALLOWED");
+    err.status = 403;
+    err.code = "PROXY_PATH_NOT_ALLOWED";
+    throw err;
+  }
+}
+
+function sanitizeProxyPath(rawTail: string): string {
+  let p = rawTail || "/";
+
+  // Normalize: ensure we always treat it as a *path*, not a URL
+  p = "/" + p.replace(/^\/+/, "");
+
+  // Block attempts to smuggle in absolute URLs or schemes
+  if (p.startsWith("//") || p.includes("://")) {
+    const err: any = new Error("INVALID_UPSTREAM_PATH");
+    err.status = 400;
+    err.code = "INVALID_UPSTREAM_PATH";
+    throw err;
+  }
+
+  // Optional: avoid .. path traversal
+  if (p.includes("..")) {
+    const err: any = new Error("INVALID_UPSTREAM_PATH");
+    err.status = 400;
+    err.code = "INVALID_UPSTREAM_PATH";
+    throw err;
+  }
+
+  return p;
+}
+
+if (PROXY_TARGET_URL) {
   console.log("[proxy] enabled", {
-    target: PROXY_TARGET,
+    target: PROXY_TARGET_URL.toString(),
     prefix: PROXY_PREFIX,
     injectHeader: PROXY_INJECT_HEADER || null,
     injectQuery: PROXY_INJECT_QUERY || null,
+    allowedPaths: PROXY_ALLOWED_PATHS,
   });
 
   toolGatewayRouter.all(`${PROXY_PREFIX}/*`, async (req: Request, res: Response) => {
-  try {
-    // 1) Verify the Bearer token (or rely on your global gate; if so, you can skip this)
-    const payload = await verifyBearer(req);
-    const sub = String(payload.sub || "");
-    if (!sub) {
-      const e: any = new Error("TOKEN_NO_SUB");
-      e.status = 401;
-      e.www = buildWwwAuthenticate(req) + ', error="invalid_token"';
-      throw e;
+    try {
+      const payload = await verifyBearer(req);
+      const sub = String(payload.sub || "");
+      if (!sub) {
+        const e: any = new Error("TOKEN_NO_SUB");
+        e.status = 401;
+        e.www = buildWwwAuthenticate(req) + ', error="invalid_token"';
+        throw e;
+      }
+
+      // Slice off the prefix and sanitize tail
+      const rawTail = req.path.slice(PROXY_PREFIX.length) || "/";
+      const tail = sanitizeProxyPath(rawTail);
+      enforceProxyPathAllowlist(tail);     // ✅ allowlist check BEFORE constructing URL
+
+      // codeql[js/request-forgery]: PROXY_TARGET_URL is constant/validated and `tail` is sanitized + allowlisted
+      const urlObj = new URL(tail, PROXY_TARGET_URL);
+
+      // Copy query params, then inject user id if configured
+      for (const [k, v] of Object.entries(req.query)) {
+        if (Array.isArray(v)) v.forEach(x => urlObj.searchParams.append(k, String(x)));
+        else if (v != null) urlObj.searchParams.append(k, String(v));
+      }
+      if (PROXY_INJECT_QUERY) urlObj.searchParams.set(PROXY_INJECT_QUERY, sub);
+
+      const headers: Record<string, string> = {};
+      for (const [k, v] of Object.entries(req.headers)) {
+        if (["host","connection","content-length","transfer-encoding","authorization"].includes(k)) continue;
+        headers[k] = Array.isArray(v) ? v.join(", ") : (v as string);
+      }
+      if (PROXY_INJECT_HEADER) headers[PROXY_INJECT_HEADER] = sub;
+
+      const method = req.method.toUpperCase();
+      const body = !["GET","HEAD"].includes(method) && req.body ? JSON.stringify(req.body) : undefined;
+      if (body) headers["content-type"] = headers["content-type"] || "application/json";
+
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), +(process.env.PROXY_TIMEOUT_MS || 5000));
+
+      // codeql[js/request-forgery]: urlObj is safe (see comment above); SSRF is mitigated
+      const upstream = await fetch(urlObj.toString(), {
+        method,
+        headers,
+        body,
+        signal: controller.signal,
+      } as any);
+
+      clearTimeout(t);
+
+      res.status(upstream.status);
+      upstream.headers.forEach((val, key) => {
+        if (!["content-length","transfer-encoding","connection"].includes(key)) {
+          res.setHeader(key, val);
+        }
+      });
+      const buf = Buffer.from(await upstream.arrayBuffer());
+      res.end(buf);
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        return res.status(502).json({ error: "upstream_timeout" });
+      }
+      if (e?.www) res.setHeader("WWW-Authenticate", e.www);
+      const status = Number(e?.status) || 502;
+
+      // (logging fix is in section 2 below)
+      console.error("[proxy:error]", { status, code: e?.code });
+
+      res.status(status).json({ error: "proxy_failed" });
     }
-
-    // 2) Build upstream URL
-    const tail = req.path.slice(PROXY_PREFIX.length) || "/";
-    const urlObj = new URL(tail, PROXY_TARGET);
-    for (const [k, v] of Object.entries(req.query)) {
-      if (Array.isArray(v)) v.forEach(x => urlObj.searchParams.append(k, String(x)));
-      else if (v != null) urlObj.searchParams.append(k, String(v));
-    }
-    if (PROXY_INJECT_QUERY) urlObj.searchParams.set(PROXY_INJECT_QUERY, sub);
-
-    // 3) Prepare headers/body
-    const headers: Record<string,string> = {};
-    for (const [k, v] of Object.entries(req.headers)) {
-      if (["host","connection","content-length","transfer-encoding","authorization"].includes(k)) continue;
-      headers[k] = Array.isArray(v) ? v.join(", ") : (v as string);
-    }
-    if (PROXY_INJECT_HEADER) headers[PROXY_INJECT_HEADER] = sub;
-
-    const method = req.method.toUpperCase();
-    const body = !["GET","HEAD"].includes(method) && req.body ? JSON.stringify(req.body) : undefined;
-    if (body) headers["content-type"] = headers["content-type"] || "application/json";
-
-    // 4) Do the upstream fetch (consider a timeout)
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), +(process.env.PROXY_TIMEOUT_MS || 5000));
-    const upstream = await fetch(urlObj.toString(), { method, headers, body, signal: controller.signal } as any);
-    clearTimeout(t);
-
-    res.status(upstream.status);
-    upstream.headers.forEach((val, key) => {
-      if (!["content-length","transfer-encoding","connection"].includes(key)) res.setHeader(key, val);
-    });
-    const buf = Buffer.from(await upstream.arrayBuffer());
-    res.end(buf); // ✅ IMPORTANT: end the response
-  } catch (e: any) {
-    if (e?.name === "AbortError") {
-      return res.status(502).json({ error: "upstream_timeout" });
-    }
-    if (e?.www) res.setHeader("WWW-Authenticate", e.www);
-    const status = Number(e?.status) || 502;
-    console.error("[proxy:error]", e?.message || e);
-    res.status(status).json({ error: "proxy_failed", detail: String(e?.message || e) });
-  }
-});
+  });
 } else {
-  console.log("[proxy] disabled (set PROXY_TARGET to enable)");
+  console.log("[proxy] disabled (set valid PROXY_TARGET to enable)");
 }
 
-// Well-knowns
-toolGatewayRouter.get("/.well-known/oauth-protected-resource", wellKnownOauthProtectedResource);
-toolGatewayRouter.get("/.well-known/openid-configuration", toolGatewayImpl);
-toolGatewayRouter.get("/.well-known/oauth-authorization-server", toolGatewayImpl);
 
-// MCP JSON-RPC + tool POSTs
-toolGatewayRouter.post("/", toolGatewayImpl);
-toolGatewayRouter.post("/mcp", toolGatewayImpl);
-toolGatewayRouter.options("/mcp", toolGatewayImpl);
+// Well-knowns (rate-limited)
+toolGatewayRouter.get(
+  "/.well-known/oauth-protected-resource",
+  discoveryLimiter as any,
+  wellKnownOauthProtectedResource
+);
+toolGatewayRouter.get(
+  "/.well-known/openid-configuration",
+  discoveryLimiter as any,
+  toolGatewayImpl
+);
+toolGatewayRouter.get(
+  "/.well-known/oauth-authorization-server",
+  discoveryLimiter as any,
+  toolGatewayImpl
+);
 
-// Auth0 Log Stream webhook (DCR auto-fix)
-toolGatewayRouter.post("/auth0/logs", auth0LogWebhook);
+
+// MCP JSON-RPC + tool POSTs (rate limited)
+toolGatewayRouter.post("/", toolLimiter as any, toolGatewayImpl);
+toolGatewayRouter.post("/mcp", mcpLimiter as any, toolGatewayImpl);
+toolGatewayRouter.options("/mcp", mcpLimiter as any, toolGatewayImpl);
+
+// Auth0 Log Stream webhook (DCR auto-fix, rate limited too)
+toolGatewayRouter.post("/auth0/logs", webhookLimiter as any, auth0LogWebhook);
+
+
