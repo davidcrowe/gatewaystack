@@ -1157,6 +1157,25 @@ const PROXY_TARGET_URL: URL | null = (() => {
   }
 })();
 
+const PROXY_ALLOWED_PATHS = (process.env.PROXY_ALLOWED_PATHS || "/").split(",")
+  .map(p => p.trim())
+  .filter(Boolean);
+
+  function enforceProxyPathAllowlist(p: string): void {
+  // Require the path to start with one of the allowed prefixes
+  const ok = PROXY_ALLOWED_PATHS.some(prefix => {
+    // normalize: ensure prefix has leading slash
+    const pref = prefix.startsWith("/") ? prefix : `/${prefix}`;
+    return p === pref || p.startsWith(pref.endsWith("/") ? pref : pref + "/");
+  });
+
+  if (!ok) {
+    const err: any = new Error("PROXY_PATH_NOT_ALLOWED");
+    err.status = 400;
+    throw err;
+  }
+}
+
 function sanitizeProxyPath(rawTail: string): string {
   let p = rawTail || "/";
 
@@ -1200,7 +1219,7 @@ if (PROXY_TARGET_URL) {
       }
 
       const rawTail = req.path.slice(PROXY_PREFIX.length) || "/";
-      const tail = sanitizeProxyPath(rawTail);
+      const tail = sanitizeProxyPath(rawTail);      enforceProxyPathAllowlist(tail);
 
       // Use the validated PROXY_TARGET_URL as the base
       const urlObj = new URL(tail, PROXY_TARGET_URL);
