@@ -1261,6 +1261,9 @@ if (PROXY_TARGET_URL) {
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), +(process.env.PROXY_TIMEOUT_MS || 5000));
 
+      // codeql[js/server-side-request-forgery]:
+      // urlObj is built from a constant, validated PROXY_TARGET_URL and an allowlisted, sanitized path (tail),
+      // so SSRF is mitigated here.
       const upstream = await fetch(urlObj.toString(), {
         method,
         headers,
