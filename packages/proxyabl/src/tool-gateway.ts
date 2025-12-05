@@ -117,16 +117,18 @@ const TOOL_SCOPES: Record<string, string[]> = parseToolScopesEnv();
 // Union of all tool scopes (what the client should actually request)
 const REQUIRED_SCOPES = Array.from(new Set(Object.values(TOOL_SCOPES).flat()));
 
-// ---- Safe logging helpers (no secrets printed) ----
+// ---- Safe logging helpers (only state, no raw values) ----
 function logCfg() {
   console.log("[cfg]", {
-    OAUTH_ISSUER,
+    OAUTH_ISSUER: OAUTH_ISSUER ? "[configured]" : "[default]",
     OAUTH_AUDIENCE: OAUTH_AUDIENCE ? "[set]" : null,
     JWKS_URI_FALLBACK: JWKS_URI_FALLBACK ? "[set]" : null,
-    FUNCTIONS_BASE,
-    APP_ORIGIN,
+    FUNCTIONS_BASE: FUNCTIONS_BASE ? "[set]" : null,
+    APP_ORIGIN: APP_ORIGIN === "*" ? "*" : "[set]",
   });
 }
+logCfg();
+
 logCfg();
 
 function readAuth(req: Request) {
@@ -596,15 +598,20 @@ export async function wellKnownOauthProtectedResource(req: Request, res: Respons
   const xfHost = req.get("x-forwarded-host") || req.get("host") || "";
   const fullUrl = `${xfProto}://${xfHost}${req.originalUrl || req.url}`;
 
+  const pathOnly = (req.originalUrl || req.url || "").split("?")[0];
+
   console.log("[wk] /.well-known/oauth-protected-resource served", {
-    url: fullUrl, method: req.method, ua, origin, referer,
+    path: pathOnly,
+    method: req.method,
   });
+
   console.log("[wk.cfg]", {
-    issuer: OAUTH_ISSUER,
+    issuer: OAUTH_ISSUER ? "[configured]" : "[default]",
     audience: OAUTH_AUDIENCE ? "[set]" : null,
     jwks_uri_fallback: JWKS_URI_FALLBACK ? "[set]" : null,
-    required_scopes: REQUIRED_SCOPES,
+    required_scopes_count: REQUIRED_SCOPES.length,
   });
+
 
   try {
     const d = await fetchJsonWithRetry(`${OAUTH_ISSUER}/.well-known/openid-configuration`);

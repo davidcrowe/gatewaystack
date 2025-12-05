@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+# 🔐 Lock down GITHUB_TOKEN for this workflow
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -31,4 +35,3 @@ jobs:
 
       - name: Build TypeScript monorepo
         run: npm run build
-

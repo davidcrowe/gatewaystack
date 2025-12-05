@@ -1,5 +1,11 @@
 name: Conformance
+
 on: [push, pull_request]
+
+# 🔐 Restrict GITHUB_TOKEN permissions (least privilege)
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
