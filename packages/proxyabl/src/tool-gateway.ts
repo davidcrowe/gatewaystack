@@ -992,6 +992,25 @@ const PROXY_PREFIX = process.env.PROXY_PREFIX || "/proxy";       // e.g. "/proxy
 const PROXY_INJECT_HEADER = process.env.PROXY_INJECT_HEADER || "";// e.g. "X-User-Id"
 const PROXY_INJECT_QUERY  = process.env.PROXY_INJECT_QUERY  || "";// e.g. "userId"
 
+function sanitizeProxyPath(rawTail: string): string {
+  let p = rawTail || "/";
+
+  // Normalize: ensure we always treat it as a path, not a URL
+  // Strip repeated leading slashes but keep one
+  p = "/" + p.replace(/^\/+/, "");
+
+  // Block attempts to smuggle in absolute URLs:
+  //  - "//evil.com" (network-path reference)
+  //  - "http://..." or "https://..." or any "scheme://"
+  if (p.startsWith("//") || p.includes("://")) {
+    const err: any = new Error("INVALID_UPSTREAM_PATH");
+    err.status = 400;
+    throw err;
+  }
+
+  return p;
+}
+
 if (PROXY_TARGET) {
   console.log("[proxy] enabled", {
     target: PROXY_TARGET,
@@ -1013,8 +1032,10 @@ if (PROXY_TARGET) {
     }
 
     // 2) Build upstream URL
-    const tail = req.path.slice(PROXY_PREFIX.length) || "/";
+    const rawTail = req.path.slice(PROXY_PREFIX.length) || "/";
+    const tail = sanitizeProxyPath(rawTail);
     const urlObj = new URL(tail, PROXY_TARGET);
+
     for (const [k, v] of Object.entries(req.query)) {
       if (Array.isArray(v)) v.forEach(x => urlObj.searchParams.append(k, String(x)));
       else if (v != null) urlObj.searchParams.append(k, String(v));
