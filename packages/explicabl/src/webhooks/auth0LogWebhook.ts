@@ -1,6 +1,7 @@
 // packages/explicabl-express/src/webhooks/auth0-log-webhook.ts
 import * as express from "express";
 import type { Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 
 /**
  * Env
@@ -23,19 +24,71 @@ const TOOL_SCOPES = (process.env.TOOL_SCOPES || process.env.REQUIRED_SCOPES || "
   .map((s) => s.trim())
   .filter(Boolean);
 
+// ---- Rate limiting for the Auth0 log webhook ----
+const LOG_WEBHOOK_WINDOW_MS = +(process.env.LOG_WEBHOOK_WINDOW_MS || 60_000); // 1 minute
+const LOG_WEBHOOK_MAX_PER_WINDOW = +(process.env.LOG_WEBHOOK_MAX_PER_WINDOW || 60);
+
+// Use IP / x-forwarded-for as the key
+const webhookKeyFromReq = (req: any): string => {
+  const xf = req.get?.("x-forwarded-for");
+  if (typeof xf === "string" && xf.length > 0) {
+    return xf.split(",")[0].trim();
+  }
+  return req.ip || "unknown";
+};
+
+const auth0WebhookLimiter = rateLimit({
+  windowMs: LOG_WEBHOOK_WINDOW_MS,
+  max: LOG_WEBHOOK_MAX_PER_WINDOW,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: webhookKeyFromReq,
+});
+
+// bridge the type mismatch between express-rate-limit and this package’s express types
+const auth0WebhookLimiterMw: express.RequestHandler =
+  auth0WebhookLimiter as unknown as express.RequestHandler;
+
+// ✅ NEW: sanitize client_id coming from logs / Auth0
+function sanitizeMgmtClientId(id: string): string {
+  if (typeof id !== "string") {
+    throw new Error("invalid_client_id_type");
+  }
+  // Auth0 client_ids are URL-safe base64-ish: letters, digits, - and _
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+    throw new Error("invalid_client_id_format");
+  }
+  return id;
+}
+
+// ✅ NEW: centralize / validate domain + path → prevents SSRF via MGMT_DOMAIN/path tricks
+function auth0MgmtUrl(path: string): string {
+  const domain = (MGMT_DOMAIN || "").trim();
+  if (!domain) {
+    throw new Error("MGMT_DOMAIN_not_set");
+  }
+  // only allow normal hostnames
+  if (!/^[a-zA-Z0-9.-]+$/.test(domain)) {
+    throw new Error(`invalid_MGMT_DOMAIN:${domain}`);
+  }
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `https://${domain}${normalizedPath}`;
+}
+
 type OAuthTokenRes = { access_token: string; token_type?: string; expires_in?: number };
 
 async function getMgmtToken(): Promise<string> {
-  const r = await fetch(`https://${MGMT_DOMAIN}/oauth/token`, {
+  const r = await fetch(auth0MgmtUrl("/oauth/token"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       grant_type: "client_credentials",
       client_id: MGMT_CLIENT_ID,
       client_secret: MGMT_CLIENT_SECRET,
-      audience: `https://${MGMT_DOMAIN}/api/v2/`
+      audience: auth0MgmtUrl("/api/v2/")
     })
   } as any);
+
   if (!r.ok) throw new Error(`mgmt_token_http_${r.status}`);
   const j = (await r.json()) as OAuthTokenRes;
   if (!j?.access_token) throw new Error("mgmt_token_missing_access_token");
@@ -49,21 +102,35 @@ async function promoteClient(mgmtToken: string, clientId: string) {
     token_endpoint_auth_method: "none",
     grant_types: ["authorization_code", "refresh_token"]
   };
-  const r = await fetch(`https://${MGMT_DOMAIN}/api/v2/clients/${clientId}`, {
-    method: "PATCH",
-    headers: { "content-type": "application/json", authorization: `Bearer ${mgmtToken}` },
-    body: JSON.stringify(patchBody)
-  } as any);
+
+  const safeClientId = sanitizeMgmtClientId(clientId);
+
+  const r = await fetch(
+    auth0MgmtUrl(`/api/v2/clients/${encodeURIComponent(safeClientId)}`),
+    {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${mgmtToken}`
+      },
+      body: JSON.stringify(patchBody)
+    } as any
+  );
+
   if (!r.ok) {
-    const txt = await r.text();
-    throw new Error(`promote_http_${r.status}:${txt}`);
+    // don’t include full response body (avoids leaking potentially sensitive info)
+    console.error("[promoteClient:error]", {
+      status: r.status,
+      client_id_suffix: safeClientId.slice(-5),
+    });
+    throw new Error(`promote_http_${r.status}`);
   }
 }
 
 async function enableGoogleForClient(mgmtToken: string, clientId: string) {
   // 1) find the connection id for google-oauth2
   const rc = await fetch(
-    `https://${MGMT_DOMAIN}/api/v2/connections?name=${encodeURIComponent(GOOGLE_CONNECTION_NAME)}`,
+    auth0MgmtUrl(`/api/v2/connections?name=${encodeURIComponent(GOOGLE_CONNECTION_NAME)}`),
     { headers: { authorization: `Bearer ${mgmtToken}` } } as any
   );
   if (!rc.ok) throw new Error(`conn_lookup_http_${rc.status}`);
@@ -75,15 +142,24 @@ async function enableGoogleForClient(mgmtToken: string, clientId: string) {
   const enabled = new Set<string>(Array.isArray(conn.enabled_clients) ? conn.enabled_clients : []);
   enabled.add(clientId);
 
-  const rp = await fetch(`https://${MGMT_DOMAIN}/api/v2/connections/${conn.id}`, {
-    method: "PATCH",
-    headers: { "content-type": "application/json", authorization: `Bearer ${mgmtToken}` },
-    body: JSON.stringify({ enabled_clients: Array.from(enabled) })
-  } as any);
+  const rp = await fetch(
+    auth0MgmtUrl(`/api/v2/connections/${encodeURIComponent(conn.id)}`),
+    {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${mgmtToken}`
+      },
+      body: JSON.stringify({ enabled_clients: Array.from(enabled) })
+    } as any
+  );
   if (!rp.ok) {
-    const txt = await rp.text();
-    throw new Error(`conn_patch_http_${rp.status}:${txt}`);
-  }
+    console.error("[enableGoogleForClient:error]", {
+      status: rp.status,
+      connection_id_suffix: conn.id.slice(-5),
+    });
+    throw new Error(`conn_patch_http_${rp.status}`);
+}
 }
 
 async function ensureClientGrant(
@@ -95,7 +171,7 @@ async function ensureClientGrant(
   const aud = (audience || "").trim();
   if (!aud || !scopes.length) return;
 
-  const r = await fetch(`https://${MGMT_DOMAIN}/api/v2/client-grants`, {
+  const r = await fetch(auth0MgmtUrl("/api/v2/client-grants"), {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -109,11 +185,19 @@ async function ensureClientGrant(
   } as any);
 
   if (!r.ok) {
-    const txt = await r.text();
-    throw new Error(`client_grant_http_${r.status}:${txt}`);
+    console.error("[ensureClientGrant:error]", {
+      status: r.status,
+      client_id_suffix: clientId.slice(-5),
+      audience_suffix: aud.slice(-10)
+    });
+    throw new Error(`client_grant_http_${r.status}`);
   }
 
-  console.log("[dcr] created client grant", { clientId, audience: aud, scopes });
+  console.log("[dcr] created client grant", {
+    client_id_suffix: clientId.slice(-5),
+    audience_suffix: aud.slice(-10),
+    scope_count: scopes.length,
+  });
 }
 
 // ---- log helpers ----
@@ -143,14 +227,15 @@ function isDcrEventRaw(ev: any): boolean {
 }
 async function findNewestChatGPTClientId(mgmtToken: string): Promise<string | null> {
   const url =
-    `https://${MGMT_DOMAIN}/api/v2/clients` +
+    auth0MgmtUrl("/api/v2/clients") +
     "?is_global=false&per_page=10&sort=created_at:-1&fields=client_id,name,created_at,app_type,grant_types,token_endpoint_auth_method&include_fields=true";
+
   const r = await fetch(url, { headers: { authorization: `Bearer ${mgmtToken}` } } as any);
   if (!r.ok) {
-    const txt = await r.text();
-    console.warn("[dcr] clients list failed", r.status, txt);
+    console.warn("[dcr] clients list failed", { status: r.status });
     return null;
   }
+
   const arr = (await r.json()) as Array<any>;
   const now = Date.now();
   for (const c of arr) {
@@ -281,11 +366,11 @@ async function handleAuth0LogWebhook(req: Request, res: Response) {
 
     await enableGoogleForClient(mgmtToken, cid);
       await ensureClientGrant(mgmtToken, cid, OAUTH_AUDIENCE, TOOL_SCOPES);
-      console.log("[dcr] promoted+enabled+granted", {
-        client_id: cid,
-        audience: OAUTH_AUDIENCE,
-        scopes: TOOL_SCOPES
-      });
+        console.log("[dcr] promoted+enabled+granted", {
+          client_id_suffix: cid.slice(-5),
+          has_audience: Boolean(OAUTH_AUDIENCE),
+          scope_count: TOOL_SCOPES.length,
+        });
     }
 
     res.status(200).json({ ok: true, promoted: dcrEvents.length });
@@ -307,14 +392,18 @@ async function handleAuth0LogWebhook(req: Request, res: Response) {
 export function auth0LogsWebhook() {
   const r = express.Router();
   // accept both text and JSON (Auth0 sometimes sends text/json variants)
-  r.post("/auth0-log-webhook", express.text({ type: "*/*", limit: "2mb" }), (req, res) => {
-    // If content-type was JSON, req.body is a string only when text middleware captured it.
-    // Try to parse JSON if it looks like JSON; otherwise leave as-is and handler will try again.
-    if (typeof req.body === "string") {
-      const looksJson = req.body.trim().startsWith("{") || req.body.trim().startsWith("[");
-      (req as any).body = looksJson ? req.body : req.body; // handler will parse if needed
+  r.post(
+    "/auth0-log-webhook",
+    auth0WebhookLimiterMw,                          // ✅ use the shimmed middleware
+    express.text({ type: "*/*", limit: "2mb" }),
+    (req, res) => {
+      if (typeof req.body === "string") {
+        const looksJson =
+          req.body.trim().startsWith("{") || req.body.trim().startsWith("[");
+        (req as any).body = looksJson ? req.body : req.body;
+      }
+      return handleAuth0LogWebhook(req, res);
     }
-    return handleAuth0LogWebhook(req, res);
-  });
+  );
   return r;
 }

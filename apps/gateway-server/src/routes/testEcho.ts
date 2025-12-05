@@ -2,6 +2,7 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import rateLimit from "express-rate-limit";
 
 // Read allowlist from env the same way your handler does (or import your util if you have one)
 function parseAllowlist(env: NodeJS.ProcessEnv): Record<string, string[]> {
@@ -11,6 +12,31 @@ function parseAllowlist(env: NodeJS.ProcessEnv): Record<string, string[]> {
   } catch {
     return {};
   }
+}
+
+// ---- Rate limiting for test echo routes ----
+function keyFromReq(req: any): string {
+  const xf = req.get?.("x-forwarded-for");
+  if (typeof xf === "string" && xf.length > 0) {
+    return xf.split(",")[0].trim();
+  }
+  return req.ip || "unknown";
+}
+
+function createTestEchoLimiter(env: NodeJS.ProcessEnv): express.RequestHandler {
+  const windowMs = +(env.TEST_ECHO_WINDOW_MS || 60_000); // 1 minute default
+  const max = +(env.TEST_ECHO_MAX_PER_WINDOW || 60);     // 60 reqs/min default
+
+  const limiter = rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: keyFromReq,
+  });
+
+  // bridge any subtle @types/express mismatch
+  return limiter as unknown as express.RequestHandler;
 }
 
 function requireJwt(env: NodeJS.ProcessEnv) {
@@ -72,8 +98,13 @@ function requireScope(env: NodeJS.ProcessEnv) {
 
 export function testEchoRoutes(env: NodeJS.ProcessEnv) {
   const r = express.Router();
+
+  // 🚦 Rate limit *before* heavy JWT verification
+  r.use(createTestEchoLimiter(env));
+
   r.use(requireJwt(env));
   r.use(requireScope(env));
+
   r.get("/echo", (req, res) => {
     res.json({
       ok: true,
@@ -83,6 +114,7 @@ export function testEchoRoutes(env: NodeJS.ProcessEnv) {
       route: "GET:/__test__/echo",
     });
   });
+
   r.post("/echo", (req, res) => {
     res.json({
       ok: true,
@@ -93,5 +125,6 @@ export function testEchoRoutes(env: NodeJS.ProcessEnv) {
       body: req.body,
     });
   });
+
   return r;
 }
