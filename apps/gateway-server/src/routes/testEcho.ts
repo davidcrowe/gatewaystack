@@ -2,7 +2,7 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 // Read allowlist from env the same way your handler does (or import your util if you have one)
 function parseAllowlist(env: NodeJS.ProcessEnv): Record<string, string[]> {
@@ -18,9 +18,10 @@ function parseAllowlist(env: NodeJS.ProcessEnv): Record<string, string[]> {
 function keyFromReq(req: any): string {
   const xf = req.get?.("x-forwarded-for");
   if (typeof xf === "string" && xf.length > 0) {
-    return xf.split(",")[0].trim();
+    const ip = xf.split(",")[0].trim();
+    return ipKeyGenerator(ip);
   }
-  return req.ip || "unknown";
+  return ipKeyGenerator(req.ip);
 }
 
 function createTestEchoLimiter(env: NodeJS.ProcessEnv): express.RequestHandler {

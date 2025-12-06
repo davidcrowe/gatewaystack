@@ -1,9 +1,15 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "../../dist/proxyabl",
-    "composite": true
+    "outDir": "dist",
+    "composite": true,
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "include": ["src"]
+  "include": ["src"], 
+  "references": [
+    { "path": "../proxyabl-core" },
+    { "path": "../request-context" }
+  ]
 }
+

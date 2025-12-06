@@ -8,7 +8,10 @@ import {
   requireScope,
 } from "@gatewaystack/validatabl";
 import { limitabl } from "@gatewaystack/limitabl";
-import { toolGatewayRouter } from "@gatewaystack/proxyabl";
+import {
+  createProxyablRouter,
+  configFromEnv as proxyablConfigFromEnv,
+} from "@gatewaystack/proxyabl";
 import { explicablRouter } from "@gatewaystack/explicabl";
 
 import { testEchoRoutes } from "./routes/testEcho";
@@ -146,7 +149,18 @@ export function buildApp(env: NodeJS.ProcessEnv) {
   // -----------------------------
   // Layer 5: proxyabl (tool / MCP gateway)
   // -----------------------------
-  app.use(toolGatewayRouter as unknown as RequestHandler);
+  const proxyablConfig = proxyablConfigFromEnv(env);
+
+  // mount under /tools so you get:
+  //   /tools/.well-known/oauth-protected-resource
+  //   /tools/.well-known/openid-configuration
+  //   /tools/.well-known/oauth-authorization-server
+  //   /tools/mcp
+  //   /tools/:toolName
+  //   /tools/proxy/*
+  //   /tools/auth0/logs
+  app.use("/tools", createProxyablRouter(proxyablConfig) as unknown as RequestHandler);
+
 
   // -----------------------------
   // Layer 6: explicabl (health, logs, webhooks)

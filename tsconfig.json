@@ -27,8 +27,28 @@
     { "path": "packages/compat" }
   ],
   "compilerOptions": {
-    "composite": true,
-    "skipLibCheck": true
+      "composite": true,
+      "skipLibCheck": true,
+      "baseUrl": ".",
+      "paths": {
+    "@gatewaystack/proxyabl-core": ["packages/proxyabl-core"],
+    "@gatewaystack/proxyabl": ["packages/proxyabl"],
+
+    "@gatewaystack/identifiabl-core": ["packages/identifiabl-core"],
+    "@gatewaystack/identifiabl": ["packages/identifiabl"],
+    "@gatewaystack/transformabl-core": ["packages/transformabl-core"],
+    "@gatewaystack/transformabl": ["packages/transformabl"],
+    "@gatewaystack/validatabl-core": ["packages/validatabl-core"],
+    "@gatewaystack/validatabl": ["packages/validatabl"],
+    "@gatewaystack/limitabl-core": ["packages/limitabl-core"],
+    "@gatewaystack/limitabl": ["packages/limitabl"],
+    "@gatewaystack/explicabl-core": ["packages/explicabl-core"],
+    "@gatewaystack/explicabl": ["packages/explicabl"],
+    "@gatewaystack/request-context": ["packages/request-context"],
+    "@gatewaystack/integrations": ["packages/integrations"],
+    "@gatewaystack/compat": ["packages/compat"]
+  }
+
   },
   "exclude": ["**/*.config.ts", "**/*.config.js", "node_modules", "dist"]
 }

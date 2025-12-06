@@ -1,10 +1,10 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "jsx": "react-jsx",
-    "outDir": "../../dist/admin-ui",
     "rootDir": "src",
-    "composite": true
+    "outDir": "../../dist/proxyabl-core",
+    "composite": true,
+    "tsBuildInfoFile": "../../dist/proxyabl-core.tsbuildinfo"
   },
   "include": ["src"]
 }
