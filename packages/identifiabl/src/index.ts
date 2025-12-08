@@ -47,7 +47,10 @@ function buildIssuerPattern(issuer: string): RegExp {
 import { createIdentifiablVerifier } from "@gatewaystack/identifiabl-core";
 
 export function identifiabl(config: IdentifiablConfig): RequestHandler {
-  const verify = createIdentifiablVerifier(config);
+  const verify = createIdentifiablVerifier({
+    ...config,
+    scopeClaim: "scope",   // ⬅️ add this
+  });
 
   const middleware: RequestHandler = async (req: any, res, next) => {
     const auth = req.headers.authorization || "";
