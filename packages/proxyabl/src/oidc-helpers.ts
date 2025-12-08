@@ -1,6 +1,6 @@
 // packages/proxyabl/src/oidc-helpers.ts
 import type { Request } from "express";
-import type { ProxyablConfig } from "../../proxyabl-core/src/config";
+import type { ProxyablConfig } from "@gatewaystack/proxyabl-core";
 
 /**
  * Normalize issuer: no trailing slash.

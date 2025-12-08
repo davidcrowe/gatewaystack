@@ -1,5 +1,9 @@
 import type { RequestHandler } from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import {
+  updateGatewayContext,
+  type GatewayIdentity,
+} from "@gatewaystack/request-context";
 
 export interface IdentifiablConfig {
   /**
@@ -40,7 +44,7 @@ function buildIssuerPattern(issuer: string): RegExp {
  *  - Checks audience and issuer
  *  - Attaches the JWT payload to req.user
  */
-import { createIdentifiablVerifier } from "identifiabl";
+import { createIdentifiablVerifier } from "@gatewaystack/identifiabl-core";
 
 export function identifiabl(config: IdentifiablConfig): RequestHandler {
   const verify = createIdentifiablVerifier(config);
@@ -58,7 +62,15 @@ export function identifiabl(config: IdentifiablConfig): RequestHandler {
       return res.status(401).json(result);
     }
 
-    req.user = result.identity;
+    // 🔹 result.identity is structurally compatible with GatewayIdentity
+    const identity = result.identity as GatewayIdentity;
+
+    // 🔹 publish identity into the shared GatewayContext
+    updateGatewayContext({ identity });
+
+    // Keep legacy behavior so existing code still works
+    req.user = identity;
+
     return next();
   };
 

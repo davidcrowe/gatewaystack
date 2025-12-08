@@ -1,6 +1,7 @@
 import express, { type RequestHandler } from "express";
 import bodyParser from "body-parser";
 
+import { runWithGatewayContext } from "@gatewaystack/request-context";
 import { identifiabl } from "@gatewaystack/identifiabl";
 import { transformabl } from "@gatewaystack/transformabl";
 import {
@@ -71,6 +72,21 @@ export function buildApp(env: NodeJS.ProcessEnv) {
   // -----------------------------
   const app = express();
   app.use(bodyParser.json({ limit: "2mb" }));
+
+  // 🔹 NEW: create a GatewayContext for every incoming request
+  app.use((req, _res, next) => {
+    runWithGatewayContext(
+      {
+        request: {
+          method: req.method,
+          path: req.path,
+          ip: (req as any).ip,
+          userAgent: req.get("user-agent") ?? undefined,
+        },
+      },
+      () => next()
+    );
+  });
 
   // Simple root health check (extra; explicabl has richer health)
   app.get("/", (_req, res) => res.status(200).json({ ok: true }));
@@ -159,8 +175,16 @@ export function buildApp(env: NodeJS.ProcessEnv) {
   //   /tools/:toolName
   //   /tools/proxy/*
   //   /tools/auth0/logs
-  app.use("/tools", createProxyablRouter(proxyablConfig) as unknown as RequestHandler);
 
+  // /tools pipeline:
+  //   GatewayContext (already set globally)
+  //   → identifiabl (JWT → ctx.identity)
+  //   → proxyabl router (scopes + routing)
+  app.use(
+    "/tools",
+    identifiablMiddleware,
+    createProxyablRouter(proxyablConfig) as unknown as RequestHandler
+  );
 
   // -----------------------------
   // Layer 6: explicabl (health, logs, webhooks)

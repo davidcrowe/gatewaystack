@@ -1,5 +1,5 @@
 // packages/proxyabl/src/index.ts
-import { configFromEnv, type ProxyablConfig } from "../../proxyabl-core/src/config";
+import { configFromEnv, type ProxyablConfig } from "@gatewaystack/proxyabl-core";
 import { createProxyablRouter } from "./router";
 
 export { createProxyablRouter, configFromEnv };

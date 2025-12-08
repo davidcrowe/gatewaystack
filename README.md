@@ -8,7 +8,9 @@
 
 An open-source control plane that makes AI agents **enterprise-ready** by enforcing user-scoped identity, policy, and audit trails on every model call.
 
-> ⚠️ Early-stage: GatewayStack is under active development. The first layer, identifiabl, is live and published (npm i identifiabl). Additional modules (transformabl, validatabl, limitabl, proxyabl, explicabl) are on the roadmap.
+> ⚠️ Early-stage: GatewayStack is under active development
+> The first layer, `identifiabl`, is live and published (`npm i identifiabl`)
+> Additional modules (`transformabl`, `validatabl`, `limitabl`, `proxyabl`, `explicabl`) are on the roadmap.
 
 **The problem:**  
 
@@ -29,7 +31,7 @@ Drop GatewayStack between AI clients (ChatGPT, Claude, your own self-hosted mode
 Every AI request flows through six governance checkpoints:
 > **Identified → Transformed → Validated → Constrained → Routed → Audited**
 
-**At a glance, GatewayStack lets you:**
+**In short, GatewayStack lets you:**
 
 - Verify **real user identity** on every AI request (RS256 JWTs via your IdP)
 - Enforce **per-user / per-tenant** policies and scopes for tools and models
@@ -41,13 +43,13 @@ Every AI request flows through six governance checkpoints:
 
 ### The Three-Party Problem
 
-> Read the full Three-Party Problem explainer at [gatewaystack.com](https://gatewaystack.com).
+> Read more about the [Three-Party Problem](https://reducibl.com/2025/12/01/the-three-party-identity-problem-in-mcp-servers.html)
 
 Modern AI apps are really **three-party systems**:
 
-**The User** — a real human with identity, roles, and permissions  
-**The LLM** — a model acting on their behalf (ChatGPT, Claude)  
-**Your Backend** — the trusted data and tools the model needs to access  
+**1 - The User** — a real human with identity, roles, and permissions  
+**2 - The LLM** — a model acting on their behalf (ChatGPT, Claude)  
+**3 - Your Backend** — the trusted data and tools the model needs to access  
 
 These three parties all talk to each other, but they don’t share a common, cryptographically verified identity layer.
 
@@ -174,9 +176,9 @@ Every request flows through the same six-layer composable pipeline:
 | ------------ | ------ | ---------------------------------------------------------------------------- |
 | **identifiabl**  | ✅     | **Foundational Trust & Identity Binding** — verifies RS256 JWTs, pins issuer/audience, and establishes the canonical subject for downstream authorization and audit. |
 | **transformabl** | ⚪     | **Content Safety Preprocessing & Risk Mitigation** — normalizes, redacts, or classifies inputs/outputs before policy and routing are applied. |
-| **validatabl**   | ✅     | **Authorization & Policy Enforcement** — deny-by-default, scope-driven access to protected resources, tools, and models. |
-| **limitabl**     | ✅     | **Rate & Spend Governance** — throttles per user/tenant to prevent runaway agents and unbounded cost. |
-| **proxyabl**     | 🧩     | **Execution Control & Identity-Aware Routing** — routes calls to the right tool/model backend, injects verified identity, and presents OAuth/PRM metadata. |
+| **validatabl**   | ⚪     | **Authorization & Policy Enforcement** — deny-by-default, scope-driven access to protected resources, tools, and models. |
+| **limitabl**     | ⚪     | **Rate & Spend Governance** — throttles per user/tenant to prevent runaway agents and unbounded cost. |
+| **proxyabl**     | ✅     | **Execution Control & Identity-Aware Routing** — routes calls to the right tool/model backend, injects verified identity, and presents OAuth/PRM metadata. |
 | **explicabl**    | ⚪     | **Accountability & Runtime Audit** — emits immutable, correlated events to your SIEM/observability stack and exposes health/conformance endpoints. |
 
 Drop it between AI clients and your backend — no SDK modification needed. Handles **RS256 JWTs**, audience/issuer checks, per-tool scopes, role-based policies, and optional **DCR** client promotion.

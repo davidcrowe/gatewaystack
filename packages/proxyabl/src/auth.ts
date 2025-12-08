@@ -2,22 +2,18 @@
 
 import type { Request } from "express";
 import type { JWTPayload } from "jose";
-import type { ProxyablConfig } from "../../proxyabl-core/src/config";
+import type { ProxyablConfig } from "@gatewaystack/proxyabl-core";
 
 import {
-  verifyAccessToken,
   assertToolScopes,
   getRequiredScopesForTool,
   ProxyablAuthError,
-  type VerifiedAccessToken,
-} from "../../proxyabl-core/src/auth";
+} from "@gatewaystack/proxyabl-core/src/auth";
 
-// AFTER
 import {
-  updateGatewayContext,
+  getGatewayContext,
   type GatewayIdentity,
 } from "@gatewaystack/request-context";
-
 
 import { buildWwwAuthenticate } from "./oidc-helpers";
 
@@ -68,69 +64,34 @@ export async function verifyBearerFromRequest(
   config: ProxyablConfig,
   req: Request,
 ): Promise<VerifiedRequestIdentity> {
-  const { hasAuth, token, tokenShape } = readAuthHeader(req);
+  const { hasAuth } = readAuthHeader(req);
 
-  if (!hasAuth) {
-    const err = new ProxyablAuthError(
-      "NO_AUTH",
-      "Missing Bearer token",
-      401,
-    ) as ProxyablAuthError & { www?: string };
+  const ctx = getGatewayContext();
+  const identity = ctx?.identity as GatewayIdentity | undefined;
+
+  if (!identity || !identity.sub) {
+    // If there was a Bearer token but no identity, treat as invalid token.
+    // If there was no Bearer, treat as missing auth.
+    const code = hasAuth ? "INVALID_TOKEN" : "NO_AUTH";
+    const message = hasAuth
+      ? "Invalid or unverified access token"
+      : "Missing Bearer token";
+
+    const err = new ProxyablAuthError(code, message, 401) as ProxyablAuthError & {
+      www?: string;
+    };
     err.www = buildWwwAuthenticate(config, req) + ', error="invalid_token"';
     throw err;
   }
 
-  if (tokenShape !== "jwt") {
-    const err = new ProxyablAuthError(
-      "ACCESS_TOKEN_NOT_JWS",
-      "Expecting JWT/JWS access token",
-      401,
-    ) as ProxyablAuthError & { www?: string };
-    err.www =
-      buildWwwAuthenticate(config, req) +
-      ', error="invalid_token", error_description="Expecting JWS access token (3 parts)"';
-    throw err;
-  }
-
-  const debugAuth = process.env.DEBUG_AUTH === "1";
-
-  const verified: VerifiedAccessToken = await verifyAccessToken(
-    config,
-    token,
-    {
-      debugAuth,
-      logger: (msg, meta) => {
-        // Safe, state-only logging
-        console.log(`[proxyabl.auth] ${msg}`, meta);
-      },
-    },
-  );
-
-  // 🔗 Bridge into GatewayContext.identity
-  // For now, assume Auth0 as the source; later we can make this configurable.
-  try {
-    const identity: GatewayIdentity = {
-      sub: verified.sub,
-      issuer: config.oidc.issuer.replace(/\/+$/, ""),
-      email: verified.email,
-      scopes: verified.effectiveScopes,
-      source: "auth0",
-      raw: verified.payload as Record<string, unknown>,
-    };
-
-    updateGatewayContext({ identity });
-  } catch (e) {
-    console.warn("[proxyabl.auth] failed to update GatewayContext", {
-      message: (e as Error)?.message,
-    });
-  }
-
+  const scopes = identity.scopes ?? [];
+  const payload = identity.raw as JWTPayload;
 
   return {
-    sub: verified.sub,
-    email: verified.email,
-    scopes: verified.effectiveScopes,
-    payload: verified.payload,
+    sub: identity.sub,
+    email: identity.email,
+    scopes,
+    payload,
   };
 }
 

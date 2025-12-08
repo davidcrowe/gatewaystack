@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import type { ProxyablConfig } from "../../proxyabl-core/src/config";
+import type { ProxyablConfig } from "@gatewaystack/proxyabl-core";
 
 import {
   buildWwwAuthenticate,
@@ -10,8 +10,6 @@ import {
   getJwksUri,
   getRequiredScopes,
 } from "./oidc-helpers";
-
-import { runWithGatewayContext } from "@gatewaystack/request-context";
 
 // 🔹 NEW: auth helpers
 import {
@@ -24,22 +22,6 @@ import { randomUUID } from "crypto";
 
 export function createProxyablRouter(config: ProxyablConfig): Router {
   const router = Router();
-
-  // 🔹 1) Per-request GatewayContext binding
-  router.use((req, _res, next) => {
-    runWithGatewayContext(
-      {
-        request: {
-          method: req.method,
-          path: req.path,
-          ip: (req as any).ip, // Express adds this
-          userAgent: req.get("user-agent") ?? undefined,
-        },
-        // identity will be filled later by proxyabl/src/auth
-      },
-      () => next()
-    );
-  });
 
   // ---- Well-known endpoints ----
   router.get("/.well-known/oauth-protected-resource", (req, res, next) =>
