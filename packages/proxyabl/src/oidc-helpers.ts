@@ -6,8 +6,14 @@ import type { ProxyablConfig } from "@gatewaystack/proxyabl-core";
  * Normalize issuer: no trailing slash.
  */
 export function getIssuer(config: ProxyablConfig): string {
-  return config.oidc.issuer.replace(/\/+$/, "");
+  const raw = config.oidc.issuer || "";
+  let s = raw;
+  while (s.endsWith("/")) {
+    s = s.slice(0, -1);
+  }
+  return s;
 }
+
 
 export function getAudience(config: ProxyablConfig): string | undefined {
   return config.oidc.audience;

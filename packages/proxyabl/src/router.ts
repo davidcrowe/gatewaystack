@@ -834,16 +834,16 @@ async function proxyHandler(
     const controller = new AbortController();
     const timeoutMs = proxyCfg.timeoutMs ?? 5000;
     const t = setTimeout(() => controller.abort(), timeoutMs);
-    
-    // codeql[js/server-side-request-forgery]:
-    // Upstream is restricted to a validated target host + strict path allowlist.
-    const upstream = await fetch(urlObj.toString(), {
-      method,
-      headers,
-      body,
-      signal: controller.signal,
-    } as any);
 
+    const upstream = await fetch(
+      urlObj.toString(), // codeql[js/server-side-request-forgery]: upstream URL is constrained by validated target host + strict path allowlist
+      {
+        method,
+        headers,
+        body,
+        signal: controller.signal,
+      } as any
+    );
 
     clearTimeout(t);
 
