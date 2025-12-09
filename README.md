@@ -14,7 +14,7 @@ npm install @gatewaystack/identifiabl @gatewaystack/proxyabl @gatewaystack/expli
 ```
 
 > **Early-stage:** GatewayStack is under active development  
-> Three layers live on npm — `@gatewaystack/identifiabl`, `@gatewaystack/proxyabl`, and `@gatewaystack/explicabl`  
+> Three layers are live on npm — `@gatewaystack/identifiabl`, `@gatewaystack/proxyabl`, and `@gatewaystack/explicabl`  
 > Three layers on the roadmap — `@gatewaystack/transformabl`, `@gatewaystack/validatabl`, and `@gatewaystack/limitabl`  
 
 **The three-party problem:**  
@@ -26,7 +26,7 @@ Modern AI apps involve three actors — the **user**, the **LLM**, and **your ba
 
 Both the LLM and your backend require **cryptographic proof of user identity** tied to every AI request... but AI platforms authenticate users on their side while your backend has no verified identity to enforce policies, filter data, or log actions. This is the [three-party problem](docs/three-party-problem.md).
 
-**GatewayStack solves this** by attaching a cryptographically verified user identity to every AI request and enforcing structured governance around it.
+**GatewayStack solves the three-party problem** by attaching a cryptographically verified user identity to every AI request and enforcing structured governance around it.
 
 Drop GatewayStack between AI clients (ChatGPT, Claude, your own self-hosted models, MCP) and your backend. It validates OAuth tokens, enforces scopes, and injects verified identity—so you can safely answer the two questions that matter most:
 
