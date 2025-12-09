@@ -13,7 +13,12 @@ import {
   createProxyablRouter,
   configFromEnv as proxyablConfigFromEnv,
 } from "@gatewaystack/proxyabl";
-import { explicablRouter } from "@gatewaystack/explicabl";
+import {
+  explicablRouter,
+  createConsoleLogger,
+  explicablLoggingMiddleware,
+} from "@gatewaystack/explicabl";
+
 
 import { testEchoRoutes } from "./routes/testEcho";
 
@@ -95,6 +100,15 @@ export function buildApp(env: NodeJS.ProcessEnv) {
       () => next()
     );
   });
+
+  const explicablLogger = createConsoleLogger({
+    serviceName: "gateway-server",
+    environment: env.NODE_ENV ?? process.env.NODE_ENV ?? "dev",
+  });
+
+  app.use(
+    explicablLoggingMiddleware(explicablLogger) as unknown as RequestHandler,
+  );
 
   // Simple root health check (extra; explicabl has richer health)
   app.get("/", (_req, res) => res.status(200).json({ ok: true }));
