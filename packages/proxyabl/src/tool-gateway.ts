@@ -1,9 +1,7 @@
-// functions/src/handlers/toolGatewayHandler.ts
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { randomUUID, createHmac } from "crypto";
-import rateLimit from "express-rate-limit";
-
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 // ---------- Config --------
 const FUNCTIONS_BASE = (process.env.FUNCTIONS_BASE ??
@@ -42,10 +40,12 @@ const DISCOVERY_MAX_PER_WINDOW = +(process.env.DISCOVERY_MAX_PER_WINDOW || 120);
 const keyFromReq = (req: any): string => {
   const xf = req.get?.("x-forwarded-for");
   if (typeof xf === "string" && xf.length > 0) {
-    return xf.split(",")[0].trim();
+    const ip = xf.split(",")[0].trim();
+    return ipKeyGenerator(ip);
   }
-  return req.ip || "unknown";
+  return ipKeyGenerator(req.ip);
 };
+
 
 
 // General limiter for tool calls (REST + MCP)

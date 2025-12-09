@@ -1,9 +1,13 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "../../dist",   // changed from "outDir": "../../dist/identifiabl",
+    "outDir": "dist",
     "composite": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [
+    { "path": "../identifiabl-core" },
+    { "path": "../request-context" }
+  ]
 }

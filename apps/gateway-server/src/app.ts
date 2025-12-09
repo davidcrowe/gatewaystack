@@ -1,6 +1,7 @@
 import express, { type RequestHandler } from "express";
 import bodyParser from "body-parser";
 
+import { runWithGatewayContext } from "@gatewaystack/request-context";
 import { identifiabl } from "@gatewaystack/identifiabl";
 import { transformabl } from "@gatewaystack/transformabl";
 import {
@@ -8,12 +9,23 @@ import {
   requireScope,
 } from "@gatewaystack/validatabl";
 import { limitabl } from "@gatewaystack/limitabl";
-import { toolGatewayRouter } from "@gatewaystack/proxyabl";
+import {
+  createProxyablRouter,
+  configFromEnv as proxyablConfigFromEnv,
+} from "@gatewaystack/proxyabl";
 import { explicablRouter } from "@gatewaystack/explicabl";
 
 import { testEchoRoutes } from "./routes/testEcho";
 
 import rateLimit from "express-rate-limit";
+
+function trimTrailingSlashes(input: string): string {
+  let out = input;
+  while (out.endsWith("/")) {
+    out = out.slice(0, -1);
+  }
+  return out;
+}
 
 export function buildApp(env: NodeJS.ProcessEnv) {
   // -----------------------------
@@ -69,6 +81,21 @@ export function buildApp(env: NodeJS.ProcessEnv) {
   const app = express();
   app.use(bodyParser.json({ limit: "2mb" }));
 
+  // 🔹 NEW: create a GatewayContext for every incoming request
+  app.use((req, _res, next) => {
+    runWithGatewayContext(
+      {
+        request: {
+          method: req.method,
+          path: req.path,
+          ip: (req as any).ip,
+          userAgent: req.get("user-agent") ?? undefined,
+        },
+      },
+      () => next()
+    );
+  });
+
   // Simple root health check (extra; explicabl has richer health)
   app.get("/", (_req, res) => res.status(200).json({ ok: true }));
 
@@ -96,24 +123,16 @@ export function buildApp(env: NodeJS.ProcessEnv) {
   // Layer 3: Mount validatabl’s PRM router early for public metadata
   // validatabl is added as added via requireScope() in the protected area below
   // -----------------------------
-  // app.use(
-  //   protectedResourceRouter({
-  //     issuer: OAUTH_ISSUER.replace(/\/+$/, ""),
-  //     audience: OAUTH_AUDIENCE,
-  //     scopes: OAUTH_SCOPES,
-  //   }) as unknown as RequestHandler
-  // );
 
   app.use(
     "/prm",
     prmLimiter,
     protectedResourceRouter({
-      issuer: OAUTH_ISSUER.replace(/\/+$/, ""),
+      issuer: trimTrailingSlashes(OAUTH_ISSUER),
       audience: OAUTH_AUDIENCE,
       scopes: OAUTH_SCOPES,
     }) as unknown as RequestHandler
   );
-
 
   // -----------------------------
   // Layer 4: limitabl (per-identity rate limiting)
@@ -146,7 +165,27 @@ export function buildApp(env: NodeJS.ProcessEnv) {
   // -----------------------------
   // Layer 5: proxyabl (tool / MCP gateway)
   // -----------------------------
-  app.use(toolGatewayRouter as unknown as RequestHandler);
+  const proxyablConfig = proxyablConfigFromEnv(env);
+
+  // Rate limiter for /tools (satisfies CodeQL, reasonable defaults)
+  const toolsRateLimiter = rateLimit({
+    windowMs,
+    max: limit * 10, // more generous than per-user limitabl
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // /tools pipeline:
+  //   GatewayContext (already set globally)
+  //   → toolsRateLimiter
+  //   → identifiabl (JWT → ctx.identity)
+  //   → proxyabl router (scopes + routing)
+  app.use(
+    "/tools",
+    toolsRateLimiter,
+    identifiablMiddleware,
+    createProxyablRouter(proxyablConfig) as unknown as RequestHandler
+  );
 
   // -----------------------------
   // Layer 6: explicabl (health, logs, webhooks)

@@ -1,7 +1,7 @@
 // packages/explicabl-express/src/webhooks/auth0-log-webhook.ts
 import * as express from "express";
 import type { Request, Response } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 /**
  * Env
@@ -32,9 +32,10 @@ const LOG_WEBHOOK_MAX_PER_WINDOW = +(process.env.LOG_WEBHOOK_MAX_PER_WINDOW || 6
 const webhookKeyFromReq = (req: any): string => {
   const xf = req.get?.("x-forwarded-for");
   if (typeof xf === "string" && xf.length > 0) {
-    return xf.split(",")[0].trim();
+    const ip = xf.split(",")[0].trim();
+    return ipKeyGenerator(ip);
   }
-  return req.ip || "unknown";
+  return ipKeyGenerator(req.ip);
 };
 
 const auth0WebhookLimiter = rateLimit({

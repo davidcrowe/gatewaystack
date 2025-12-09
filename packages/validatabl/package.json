@@ -11,6 +11,9 @@
       "import": "./dist/index.js"
     }
   },
+  "scripts": {
+    "build": "tsc -b"
+  },
   "peerDependencies": {
     "@gatewaystack/validatabl-core": "*",
     "express": "^4"

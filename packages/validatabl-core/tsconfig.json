@@ -11,6 +11,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
 
     "baseUrl": ".",   // 👈 relative to packages/identifiabl-core
     "paths": {
