@@ -784,8 +784,25 @@ async function proxyHandler(
     // 3) Enforce allowlist BEFORE constructing URL
     enforceProxyPathAllowlist(tail, allowedPaths);
 
-    // 4) Build upstream URL
+    // 4) Build upstream URL anchored to validated baseUrl
     const urlObj = new URL(tail, baseUrl);
+
+    // Extra SSRF guard: ensure hostname + protocol still match the configured target
+    if (urlObj.hostname !== baseUrl.hostname || urlObj.protocol !== baseUrl.protocol) {
+      console.warn("[proxyabl.proxy] host/protocol mismatch after URL construction", {
+        baseHost: baseUrl.hostname,
+        baseProto: baseUrl.protocol,
+        urlHost: urlObj.hostname,
+        urlProto: urlObj.protocol,
+      });
+
+      res.status(400).json({
+        ok: false,
+        error: "invalid_upstream_url",
+        detail: "Upstream URL host/protocol mismatch",
+      });
+      return;
+    }
 
     // Copy original query params
     for (const [k, v] of Object.entries(req.query)) {
@@ -835,15 +852,12 @@ async function proxyHandler(
     const timeoutMs = proxyCfg.timeoutMs ?? 5000;
     const t = setTimeout(() => controller.abort(), timeoutMs);
 
-    const upstream = await fetch(
-      urlObj.toString(), // codeql[js/server-side-request-forgery]: upstream URL is constrained by validated target host + strict path allowlist
-      {
-        method,
-        headers,
-        body,
-        signal: controller.signal,
-      } as any
-    );
+    const upstream = await fetch(urlObj.toString(), {
+      method,
+      headers,
+      body,
+      signal: controller.signal,
+    } as any);
 
     clearTimeout(t);
 
