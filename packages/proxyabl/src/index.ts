@@ -1,8 +1,15 @@
-// packages/proxyabl/src/index.ts
 import { configFromEnv, type ProxyablConfig } from "@gatewaystack/proxyabl-core";
 import { createProxyablRouter } from "./router";
 
-export { createProxyablRouter, configFromEnv };
-export type { ProxyablConfig };
+// NEW: add these (you will create them next)
+import { createProxyablMiddleware } from "./middleware";
+import { createProxyablClient } from "./client";
 
-export * from "./tool-gateway";
+export { 
+  createProxyablRouter, 
+  createProxyablMiddleware, 
+  createProxyablClient,
+  configFromEnv 
+};
+
+export type { ProxyablConfig };

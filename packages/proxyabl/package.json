@@ -1,6 +1,6 @@
 {
   "name": "@gatewaystack/proxyabl",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "private": false,
   "type": "module",
   "main": "dist/index.js",

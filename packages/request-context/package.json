@@ -1,8 +1,9 @@
 {
   "name": "@gatewaystack/request-context",
-  "version": "0.1.0",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": { "build": "tsc -b" }
+  "version": "0.0.3",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -b"
+  }
 }
-
