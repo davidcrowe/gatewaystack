@@ -4,12 +4,15 @@
     "rootDir": "src",
     "outDir": "dist",
     "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": ["node"],
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "include": ["src"], 
+  "include": ["src"],
   "references": [
     { "path": "../proxyabl-core" },
     { "path": "../request-context" }
   ]
 }
-

@@ -1,21 +1,43 @@
 # GatewayStack 
 ## Agentic Control Plane for User-Scoped AI Governance
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)
-![Cloud Run](https://img.shields.io/badge/Cloud%20Run-ready-4285F4)
-![Auth0](https://img.shields.io/badge/Auth0-RS256-orange)
-[![MCP/Auth Conformance](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavidcrowe%2Fgatewaystack%2Fmain%2Fdocs%2Fconformance.json&query=$.version&label=MCP%2FAuth%20Conformance)](https://github.com/davidcrowe/gatewaystack/tree/main/docs/conformance.json)
+<p align="center">
+  <img src="./assets/banner.png" alt="GatewayStack banner" />
+</p>
 
-GatewayStack is an open-source Agentic Control Plane that makes AI agents **enterprise-ready** by enforcing user-scoped identity, policy, limits, and audit trails on every model call.
+<p align="center">
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License" />
+  </a>
+  <img src="https://img.shields.io/badge/TypeScript-5.x-blue" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Cloud%20Run-ready-4285F4" alt="Cloud Run" />
+  <img src="https://img.shields.io/badge/Auth0-RS256-orange" alt="Auth0 RS256" />
+  <a href="https://github.com/davidcrowe/gatewaystack/tree/main/docs/conformance.json">
+    <img
+      src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavidcrowe%2Fgatewaystack%2Fmain%2Fdocs%2Fconformance.json&query=$.version&label=MCP%2FAuth%20Conformance"
+      alt="MCP Auth Conformance"
+    />
+  </a>
+</p>
+
+<p align="center"><strong>Trust and governance layer between users, LLMs, and your backend</strong></p>
+
+<p align="center">GatewayStack makes AI agent tool calls **enterprise-ready** by enforcing verified identity, authorization, limits, routing, and auditing.</p>
+
+<p align="center">
+  <strong><a href="https://github.com/davidcrowe/gatewaystack-chatgpt-starter">Want to see this working end-to-end in ChatGPT right now? </br> **Start with the reference implementation →** </br> (no code demo, live in minutes)</a></strong><br/>
+</p>
 
 ```bash
 npm install @gatewaystack/identifiabl @gatewaystack/proxyabl @gatewaystack/explicabl @gatewaystack/request-context \
 ```
 
-> **Early-stage:** GatewayStack is under active development  
-> Three layers are live on npm — `@gatewaystack/identifiabl`, `@gatewaystack/proxyabl`, and `@gatewaystack/explicabl`  
-> Three layers on the roadmap — `@gatewaystack/transformabl`, `@gatewaystack/validatabl`, and `@gatewaystack/limitabl`  
+## Status
+
+- ✅ Live on npm: `identifiabl`, `proxyabl`, `explicabl`, `request-context`
+- 🛠 In progress: `validatabl`, `limitabl`
+- 🗺 Roadmap: `transformabl`
+
 
 **The three-party problem:**  
 
@@ -166,6 +188,7 @@ This starts:
 | **Rate limiting** | ✅ Built-in | ✅ Built-in |
 | **Path/method routing** | ✅ Built-in | ✅ Built-in |
 | **User identity normalization** | ❌ Manual (custom plugin) | ✅ Built-in |
+| **Three-party identity binding (LLM → backend)** | ❌ (custom logic) | ✅ Built-in |
 | **Per-tool scope enforcement** | ❌ Manual (custom policy) | ✅ Built-in |
 | **Apps SDK / MCP compliance** | ❌ Manual (PRM endpoint) | ✅ Built-in |
 | **Pre-flight cost checks** | ❌ Manual (custom plugin) | ✅ Roadmap |

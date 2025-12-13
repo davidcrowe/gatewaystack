@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import type { ProxyablConfig } from "@gatewaystack/proxyabl-core";
-import { verifyBearerFromRequest, ensureToolScopesForRequest } from "./auth";
+import { verifyBearerFromRequest, ensureToolScopesForRequest } from "./auth.js";
 
 export function createProxyablMiddleware(config: ProxyablConfig) {
   return async function proxyablMiddleware(req: Request, res: Response, next: NextFunction) {

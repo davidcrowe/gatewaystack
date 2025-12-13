@@ -5,8 +5,8 @@ import {
   type JWTPayload,
   type JWTVerifyGetKey,
 } from "jose";
-import type { ProxyablConfig } from "./config";
-import { trimTrailingSlashes } from "./config";
+import type { ProxyablConfig } from "./config.js";
+import { trimTrailingSlashes } from "./config.js";
 
 
 export interface VerifiedAccessTokenPayload extends JWTPayload {

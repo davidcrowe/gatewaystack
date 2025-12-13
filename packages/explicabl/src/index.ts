@@ -7,11 +7,11 @@ import {
   type NextFunction,
   type RequestHandler,
 } from "express";
-import { healthRoutes } from "./health";
-import { auth0LogsWebhook } from "./webhooks/auth0LogWebhook";
+import { healthRoutes } from "./health.js";
+import { auth0LogsWebhook } from "./webhooks/auth0LogWebhook.js";
 
-export { healthRoutes } from "./health";
-export { auth0LogsWebhook } from "./webhooks/auth0LogWebhook";
+export { healthRoutes } from "./health.js";
+export { auth0LogsWebhook } from "./webhooks/auth0LogWebhook.js";
 
 /**
  * MVP Explicabl config

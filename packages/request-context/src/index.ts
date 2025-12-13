@@ -1,11 +1,11 @@
 // packages/request-context/src/index.ts
 
-export * from "./types";
+export * from "./types.js";
 
 import type {
   GatewayContext,
   GatewayRequestMeta,
-} from "./types";
+} from "./types.js";
 
 // New helper for "overrides" shape
 type GatewayContextOverrides = Omit<Partial<GatewayContext>, "request"> & {

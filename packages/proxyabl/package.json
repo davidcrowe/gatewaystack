@@ -1,6 +1,6 @@
 {
   "name": "@gatewaystack/proxyabl",
-  "version": "0.0.3",
+  "version": "0.0.10",
   "private": false,
   "type": "module",
   "main": "dist/index.js",
@@ -8,16 +8,24 @@
   "exports": {
     ".": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "express": "^4.22.0",
-    "@gatewaystack/proxyabl-core": "0.0.1",
-    "@gatewaystack/request-context": "0.1.0"
-    },
+    "express-rate-limit": "^7.5.0",
+    "@gatewaystack/proxyabl-core": "0.0.3",
+    "@gatewaystack/request-context": "0.0.6"
+  },
   "devDependencies": {
     "@types/express": "^4.17.21",
+    "@types/express-rate-limit": "^7.0.3",
     "typescript": "^5.6.3",
     "tsx": "^4.19.2"
   }

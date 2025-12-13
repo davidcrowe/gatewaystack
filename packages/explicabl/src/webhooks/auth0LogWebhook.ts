@@ -1,7 +1,7 @@
 // packages/explicabl-express/src/webhooks/auth0-log-webhook.ts
 import * as express from "express";
 import type { Request, Response } from "express";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import rateLimit from "express-rate-limit";
 
 /**
  * Env
@@ -28,15 +28,24 @@ const TOOL_SCOPES = (process.env.TOOL_SCOPES || process.env.REQUIRED_SCOPES || "
 const LOG_WEBHOOK_WINDOW_MS = +(process.env.LOG_WEBHOOK_WINDOW_MS || 60_000); // 1 minute
 const LOG_WEBHOOK_MAX_PER_WINDOW = +(process.env.LOG_WEBHOOK_MAX_PER_WINDOW || 60);
 
-// Use IP / x-forwarded-for as the key
-const webhookKeyFromReq = (req: any): string => {
-  const xf = req.get?.("x-forwarded-for");
-  if (typeof xf === "string" && xf.length > 0) {
-    const ip = xf.split(",")[0].trim();
-    return ipKeyGenerator(ip);
-  }
-  return ipKeyGenerator(req.ip);
+type RateLimitLikeRequest = {
+  ip?: string;
+  get?(header: string): string | string[] | undefined;
+  connection?: { remoteAddress?: string | undefined } | undefined;
 };
+
+function webhookKeyFromReq(req: RateLimitLikeRequest): string {
+  const xf = req.get?.("x-forwarded-for");
+  if (typeof xf === "string") {
+    return xf.split(",")[0].trim();
+  }
+  return (
+    (req.ip as string) ||
+    (req.connection && req.connection.remoteAddress) ||
+    "unknown"
+  );
+}
+
 
 const auth0WebhookLimiter = rateLimit({
   windowMs: LOG_WEBHOOK_WINDOW_MS,

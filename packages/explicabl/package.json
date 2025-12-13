@@ -1,6 +1,6 @@
 {
   "name": "@gatewaystack/explicabl",
-  "version": "0.0.1",
+  "version": "0.0.5",
   "private": false,
   "type": "module",
   "main": "dist/index.js",
@@ -8,8 +8,14 @@
   "exports": {
     ".": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "express": "^4.22.0"

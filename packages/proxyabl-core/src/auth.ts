@@ -1,7 +1,7 @@
 // packages/proxyabl-core/src/auth.ts
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
-import type { ProxyablConfig } from "./config";
-import { trimTrailingSlashes } from "./config";
+import type { ProxyablConfig } from "./config.js";
+import { trimTrailingSlashes } from "./config.js";
 
 /**
  * Normalized, verified access token surface returned by core.
