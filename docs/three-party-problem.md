@@ -46,3 +46,112 @@ The link between the LLM and the backend becomes a security risk. And you can't:
 — Audit by user ("who made this query?" → not sure)
 
 Every MCP developer ends up hand-rolling this identify and governance layer. GatewayStack exists to make it more robust and consistent. 
+
+### Direction 1: Enterprise Controlling Model Access
+
+**Requirement:** Only doctors can use medical models
+
+```
+    USER                    BACKEND                 AI/LLM
+  (Doctor)              (Your API)              (Medical Model)
+     │                       │                         │
+     │  "Use medical model"  │                         │
+     ├──────────────────────►│                         │
+     │                       │   Shared API Key        │
+     │                       ├────────────────────────►│
+     │                       │                         │
+     │                       │ ❌ No identity proof    │
+     │                       │ ❌ Can't verify role    │
+     │                       │ ❌ Anyone can access    │
+     │                       │                         │
+     │                       │◄────────────────────────┤
+     │◄──────────────────────┤      Response           │
+     │                       │                         │
+```
+
+**Problem:** Backend can't identify user to enforce role-scoped model access
+
+```
+    USER              GATEWAYSTACK           BACKEND       AI/LLM
+  (Doctor)           (Identity +          (Your API)      (Medical
+                      Policy Layer)                        Model)
+     │                    │                   │               │
+     │  OAuth token       │                   │               │
+     ├───────────────────►│                   │               │
+     │                    │                   │               │
+     │                    │ ✓ Verify identity │               │
+     │                    │ ✓ Check role      │               │
+     │                    │ ✓ Check scopes    │               │
+     │                    │                   │               │
+     │                    │ X-User-Id: 123    │               │
+     │                    │ X-Role: doctor    │               │
+     │                    ├──────────────────►│               │
+     │                    │                   │               │
+     │                    │                   │ Verified ID   │
+     │                    │                   ├──────────────►│
+     │                    │                   │               │
+     │                    │                   │◄──────────────┤
+     │                    │◄──────────────────┤   Response    │
+     │◄───────────────────┤                   │               │
+     │                    │                   │               │
+```
+
+**Result:** With GatewayStack, role-based access enforced and audit trail produced: "Dr. Smith used gpt-4-medical at 2:15pm"
+
+### Direction 2: Users Accessing Their Own Data  
+
+**Requirement:** Show me *my* calendar, not everyones
+
+```
+    USER                    LLM                     BACKEND
+  (Alice)              (ChatGPT)               (Calendar API)
+     │                      │                         │
+     │ "Show my calendar"   │                         │
+     ├─────────────────────►│                         │
+     │                      │                         │
+     │  (Alice logged in    │   GET /calendar         │
+     │   to ChatGPT)        │   Shared API Key        │
+     │                      ├────────────────────────►│
+     │                      │                         │
+     │                      │ ❌ No user identity     │
+     │                      │ ❌ Can't filter         │
+     │                      │                         │
+     │                      │◄────────────────────────┤
+     │                      │  Returns EVERYONE's     │
+     │                      │  calendar events!       │
+     │◄─────────────────────┤                         │
+     │  Shows all events    │                         │
+```
+
+**Problem:** Backend can't identify user to enforce user-scoped data access and returns everyone's data (data leakage)
+
+```
+    USER                    LLM              GATEWAYSTACK      BACKEND
+  (Alice)              (ChatGPT)           (Identity         (Calendar
+                                            Injection)         API)
+     │                      │                    │               │
+     │ "Show my calendar"   │                    │               │
+     ├─────────────────────►│                    │               │
+     │                      │                    │               │
+     │  (Alice logged in    │  OAuth token       │               │
+     │   to ChatGPT)        │  for Alice         │               │
+     │                      ├───────────────────►│               │
+     │                      │                    │               │
+     │                      │                    │ ✓ Verify      │
+     │                      │                    │   Alice's ID  │
+     │                      │                    │               │
+     │                      │                    │ GET /calendar │
+     │                      │                    │ X-User-Id:    │
+     │                      │                    │   alice_123   │
+     │                      │                    ├──────────────►│
+     │                      │                    │               │
+     │                      │                    │               │ filter by
+     │                      │                    │               │ alice_123
+     │                      │                    │◄──────────────┤
+     │                      │◄───────────────────┤ Alice's       │
+     │◄─────────────────────┤  events only       │ events only   │
+     │  Shows only          │                    │               │
+     │  Alice's events      │                    │               │
+```
+
+**Result:** With GatewayStack, you get per-user data filtering from a cryptographically verified identity with an audit trail: "Alice accessed her calendar via ChatGPT"

@@ -2,7 +2,7 @@
 ## Agentic Control Plane for User-Scoped AI Governance
 
 <p align="center">
-  <img src="./assets/banner.png" alt="GatewayStack banner" />
+  <img src="./assets/gatewaystack-banner.png" alt="GatewayStack banner" />
 </p>
 
 <p align="center">
@@ -22,10 +22,12 @@
 
 <p align="center"><strong>Trust and governance layer between users, LLMs, and your backend</strong></p>
 
-<p align="center">GatewayStack makes AI agent tool calls **enterprise-ready** by enforcing verified identity, authorization, limits, routing, and auditing.</p>
+<p align="center">Make AI agent tool calls <strong>enterprise-ready</strong> by enforcing verified identity, authorization, limits, routing, & auditing.</p>
 
 <p align="center">
-  <strong><a href="https://github.com/davidcrowe/gatewaystack-chatgpt-starter">Want to see this working end-to-end in ChatGPT right now? </br> **Start with the reference implementation →** </br> (no code demo, live in minutes)</a></strong><br/>
+  <strong><a href="https://github.com/davidcrowe/gatewaystack-chatgpt-starter">Reference implementation</a></strong>
+  <br/>
+  <strong><a href="https://github.com/davidcrowe/gatewaystack-chatgpt-starter/blob/main/docs/live-demo.md">Live demo in ChatGPT</a></strong>
 </p>
 
 ```bash
@@ -34,21 +36,74 @@ npm install @gatewaystack/identifiabl @gatewaystack/proxyabl @gatewaystack/expli
 
 ## Status
 
-- ✅ Live on npm: `identifiabl`, `proxyabl`, `explicabl`, `request-context`
-- 🛠 In progress: `validatabl`, `limitabl`
-- 🗺 Roadmap: `transformabl`
+- Live on npm: `identifiabl`, `proxyabl`, `explicabl`, `request-context`
+- In progress: `validatabl`, `limitabl`
+- Roadmap: `transformabl`
 
-
-**The three-party problem:**  
+## The three-party problem
 
 Modern AI apps involve three actors — the **user**, the **LLM**, and **your backend** — yet there is no shared identity layer binding them together. This creates data leakage, policy bypass, and audit gaps.
+
+```
+        USER
+      (Alice/Doctor)
+           │
+           │ ✓ Authenticated
+           │   (logged in)
+           ▼
+         LLM
+    (ChatGPT/Claude)
+           │
+           │ ❌ Identity NOT transferred
+           │    (shared API key used)
+           ▼
+       BACKEND
+    (Your API/Data)
+           │
+           │ ❓ Who is this request for?
+           │ ❓ What role do they have?
+           │ ❓ What are they allowed to do?
+```
 
 - Users want AI to access *their* data (ChatGPT reading *my* calendar). 
 - Enterprises want to control *who* can use AI models (only doctors can use medical models, only directors can send sensitive prompts). 
 
-Both the LLM and your backend require **cryptographic proof of user identity** tied to every AI request... but AI platforms authenticate users on their side while your backend has no verified identity to enforce policies, filter data, or log actions. This is the [three-party problem](docs/three-party-problem.md).
+Both the LLM and your backend require **cryptographic proof of user identity** tied to every AI request... but AI platforms authenticate users on their side while your backend has no verified identity to enforce policies, filter data, or log actions.
 
-**GatewayStack solves the three-party problem** by attaching a cryptographically verified user identity to every AI request and enforcing structured governance around it.
+**This creates two critical problems:**
+- Enterprises can't control who uses which models
+- Users' data leaks to other users
+
+Read the full [three-party problem breakdown](docs/three-party-problem.md)
+
+### How GatewayStack Solves This
+
+**GatewayStack attaches a cryptographically verified user identity to every AI request** and enforces structured governance around it.
+
+```
+         USER
+      (Alice/Doctor)
+           │
+           │ ✓ Authenticated
+           ▼
+         LLM
+    (ChatGPT/Claude)
+           │
+           │ ✓ Cryptographic proof
+           │   (RS256 JWT token)
+           ▼
+     GATEWAYSTACK
+   (Verify & Inject)
+           │
+           │ ✓ Identity transferred
+           │   (X-User-Id, X-Role, etc.)
+           ▼
+       BACKEND
+    (Your API/Data)
+           │
+           │ ✅ Knows: Alice, Doctor, Scopes
+           │ ✅ Can filter & enforce policy
+```
 
 Drop GatewayStack between AI clients (ChatGPT, Claude, your own self-hosted models, MCP) and your backend. It validates OAuth tokens, enforces scopes, and injects verified identity—so you can safely answer the two questions that matter most:
 
@@ -58,7 +113,7 @@ Drop GatewayStack between AI clients (ChatGPT, Claude, your own self-hosted mode
 Every AI request flows through six governance checkpoints:
 > **Identified → Transformed → Validated → Constrained → Routed → Audited**
 
-**In short, GatewayStack lets you:**
+## GatewayStack lets you
 
 - Verify **real user identity** on every AI request (RS256 JWTs via your IdP)
 - Enforce **per-user / per-tenant** policies and scopes for tools and models
@@ -66,9 +121,7 @@ Every AI request flows through six governance checkpoints:
 - Inject **X-User-Id / X-Org-Id** into downstream services (no JWT handling there)
 - Emit **audit-ready logs** for “who did what, with which data, via which model”
 
-→ See full examples: **[docs/examples.md](docs/examples.md)**
-
----
+See full examples: **[docs/examples.md](docs/examples.md)**
 
 ## Quickstart — Code (3 minutes)
 
