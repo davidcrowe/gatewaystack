@@ -204,18 +204,6 @@ npx ts-node app.ts
 
 Clone the repo and run the reference gateway:
 
-```
-npx ts-node app.ts
-# or:
-# npx tsx app.ts
-# or compile with tsc and run:
-# npx tsc && node dist/app.js
-```
-
-## Quickstart — CLI
-
-Clone the repo and run the reference gateway:
-
 ```bash
 git clone https://github.com/davidcrowe/GatewayStack
 cd GatewayStack
