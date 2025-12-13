@@ -16,7 +16,7 @@ import {
   type GatewayIdentity,
 } from "@gatewaystack/request-context";
 
-import { buildWwwAuthenticate } from "./oidc-helpers";
+import { buildWwwAuthenticate } from "./oidc-helpers.js";
 
 /**
  * Parsed Authorization header for quick diagnostics.

@@ -1,18 +1,27 @@
 {
   "name": "@gatewaystack/identifiabl",
-  "private": false,  
-  "version": "0.0.1",
+  "private": false,
+  "version": "0.0.6",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "jose": "^5.0.0",
     "identifiabl": "0.1.0",
-    "@gatewaystack/request-context": "0.1.0"
+    "@gatewaystack/request-context": "^0.0.6"
   },
   "peerDependencies": {
     "express": "^4.0.0 || ^5.0.0"
   },
-    "scripts": {
+  "scripts": {
     "build": "tsc -p tsconfig.json",
     "prepublishOnly": "npm run build"
   }

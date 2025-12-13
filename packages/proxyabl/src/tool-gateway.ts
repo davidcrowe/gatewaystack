@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { randomUUID, createHmac } from "crypto";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import rateLimit from "express-rate-limit";
 
 // ---------- Config --------
 const FUNCTIONS_BASE = (process.env.FUNCTIONS_BASE ??
@@ -36,17 +36,23 @@ const MCP_MAX_PER_WINDOW  = +(process.env.MCP_MAX_PER_WINDOW || 60);
 const WEBHOOK_MAX_PER_WINDOW = +(process.env.WEBHOOK_MAX_PER_WINDOW || 30);
 const DISCOVERY_MAX_PER_WINDOW = +(process.env.DISCOVERY_MAX_PER_WINDOW || 120);
 
-// Loosen the param type to avoid cross-package @types/express mismatch
-const keyFromReq = (req: any): string => {
-  const xf = req.get?.("x-forwarded-for");
-  if (typeof xf === "string" && xf.length > 0) {
-    const ip = xf.split(",")[0].trim();
-    return ipKeyGenerator(ip);
-  }
-  return ipKeyGenerator(req.ip);
+type RateLimitLikeRequest = {
+  ip?: string;
+  get?(header: string): string | string[] | undefined;
+  connection?: { remoteAddress?: string | undefined } | undefined;
 };
 
-
+function keyFromReq(req: RateLimitLikeRequest): string {
+  const xf = req.get?.("x-forwarded-for");
+  if (typeof xf === "string") {
+    return xf.split(",")[0].trim();
+  }
+  return (
+    (req.ip as string) ||
+    (req.connection && req.connection.remoteAddress) ||
+    "unknown"
+  );
+}
 
 // General limiter for tool calls (REST + MCP)
 const toolLimiter = rateLimit({

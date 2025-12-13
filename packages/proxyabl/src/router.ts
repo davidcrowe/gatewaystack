@@ -10,13 +10,13 @@ import {
   getScopesSupported,
   getJwksUri,
   getRequiredScopes,
-} from "./oidc-helpers";
+} from "./oidc-helpers.js";
 
 // 🔹 NEW: auth helpers
 import {
   verifyBearerFromRequest,
   ensureToolScopesForRequest,
-} from "./auth";
+} from "./auth.js";
 
 // 🔹 NEW: if you want a requestId like before
 import { randomUUID } from "crypto";

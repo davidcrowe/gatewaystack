@@ -1,10 +1,10 @@
 // packages/proxyabl-core/src/index.ts
-export * from "./config";
-export * from "./oidc";
+export * from "./config.js";
+export * from "./oidc.js";
 export {
   ProxyablAuthError,
   verifyAccessToken,
   assertToolScopes,
   getRequiredScopesForTool,
   type VerifiedAccessToken,
-} from "./auth";
+} from "./auth.js";

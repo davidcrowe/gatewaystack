@@ -1,11 +1,23 @@
 {
   "name": "@gatewaystack/proxyabl-core",
-  "version": "0.0.1",
+  "version": "0.0.3",
+  "private": false,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsc -b"
+  "exports": {
+    ".": "./dist/index.js"
   },
-  "files": ["dist"]
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
 }

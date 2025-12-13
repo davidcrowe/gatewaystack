@@ -1,5 +1,6 @@
 import type { RequestHandler } from "express";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import rateLimit from "express-rate-limit";
+import type { Request } from "express";
 
 export interface LimitablConfig {
   /**
@@ -13,6 +14,22 @@ export interface LimitablConfig {
   limit: number;
 }
 
+function keyFromReq(req: Request): string {
+  const xf = req.get?.("x-forwarded-for");
+  if (typeof xf === "string") {
+    // Take first IP in X-Forwarded-For
+    return xf.split(",")[0].trim();
+  }
+
+  // Fallbacks
+  return (
+    (req.ip as string) ||
+    // @ts-ignore – older Express types
+    (req.connection && (req.connection as any).remoteAddress) ||
+    "unknown"
+  );
+}
+
 /**
  * Express middleware that applies a per-identity rate limit:
  *  - Prefer req.user.sub
@@ -24,7 +41,7 @@ export function limitabl(config: LimitablConfig): RequestHandler {
     windowMs: config.windowMs,
     limit: config.limit,
     keyGenerator: (req: any) =>
-      req.user?.sub || req.user?.org_id || ipKeyGenerator(req),
+      req.user?.sub || req.user?.org_id || keyFromReq(req),
     standardHeaders: true,
     legacyHeaders: false,
   });

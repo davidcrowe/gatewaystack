@@ -1,56 +1,58 @@
+// packages/identifiabl/src/index.ts
 import type { RequestHandler } from "express";
-import { createRemoteJWKSet, jwtVerify } from "jose";
 import {
   updateGatewayContext,
   type GatewayIdentity,
 } from "@gatewaystack/request-context";
+import {
+  createIdentifiablVerifier as coreCreateIdentifiablVerifier,
+  // (optional) re-export types from core if you want
+  // type IdentifiablResult,
+} from "identifiabl";
 
 export interface IdentifiablConfig {
-  /**
-   * Expected issuer, e.g. "https://example.auth0.com"
-   * Can have or not have a trailing slash; we normalize it.
-   */
   issuer: string;
-  /**
-   * Expected audience (API identifier).
-   */
   audience: string;
-  /**
-   * Optional JWKS URI. If not provided, defaults to
-   * `${issuerWithoutTrailingSlash}/.well-known/jwks.json`.
-   */
   jwksUri?: string;
+
+  // Optional overrides, but we set good defaults for GatewayStack:
+  source?: string;
+  scopeClaim?: string;
+  roleClaim?: string;
+  tenantClaim?: string;
+  planClaim?: string;
 }
 
 /**
- * Escape a string for safe use inside a RegExp literal.
+ * Gateway-flavored identifiabl verifier.
+ *
+ * Wraps the core verifier and bakes in our standard conventions:
+ * - source: "auth0"
+ * - scopeClaim: "scope"
+ * - roleClaim: "permissions"
+ *
+ * Call this in non-Express contexts (e.g., Cloud Run handlers) to get
+ * a verifier that returns an identity usable as a GatewayIdentity.
  */
-function escapeForRegex(input: string): string {
-  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
- * Build a pattern that matches the issuer with or without a trailing slash.
- */
-function buildIssuerPattern(issuer: string): RegExp {
-  const issuerNoSlash = issuer.replace(/\/+$/, "");
-  return new RegExp(`^${escapeForRegex(issuerNoSlash)}\\/?$`);
-}
-
-/**
- * Express middleware that:
- *  - Extracts a Bearer token
- *  - Verifies it with JWKS (jose)
- *  - Checks audience and issuer
- *  - Attaches the JWT payload to req.user
- */
-import { createIdentifiablVerifier } from "identifiabl";
-
-export function identifiabl(config: IdentifiablConfig): RequestHandler {
-  const verify = createIdentifiablVerifier({
+export function createIdentifiablVerifier(config: IdentifiablConfig) {
+  return coreCreateIdentifiablVerifier({
+    // 👇 GatewayStack defaults
+    source: "auth0",
+    scopeClaim: "scope",
+    roleClaim: "permissions",
+    // allow callers to override if needed
     ...config,
-    scopeClaim: "scope",   // ⬅️ add this
   });
+}
+
+/**
+ * Express middleware:
+ * - Reads Bearer token from Authorization header
+ * - Verifies it with identifiabl
+ * - Stores identity in GatewayContext and req.user
+ */
+export function identifiabl(config: IdentifiablConfig): RequestHandler {
+  const verify = createIdentifiablVerifier(config);
 
   const middleware: RequestHandler = async (req: any, res, next) => {
     const auth = req.headers.authorization || "";
@@ -65,13 +67,8 @@ export function identifiabl(config: IdentifiablConfig): RequestHandler {
       return res.status(401).json(result);
     }
 
-    // 🔹 result.identity is structurally compatible with GatewayIdentity
     const identity = result.identity as GatewayIdentity;
-
-    // 🔹 publish identity into the shared GatewayContext
     updateGatewayContext({ identity });
-
-    // Keep legacy behavior so existing code still works
     req.user = identity;
 
     return next();
@@ -79,3 +76,6 @@ export function identifiabl(config: IdentifiablConfig): RequestHandler {
 
   return middleware;
 }
+
+// If you want to keep the old export shape exactly, this is now redundant but harmless:
+// export const createIdentifiablVerifier = coreCreateIdentifiablVerifier;

@@ -2,7 +2,7 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import rateLimit from "express-rate-limit";
 
 // Read allowlist from env the same way your handler does (or import your util if you have one)
 function parseAllowlist(env: NodeJS.ProcessEnv): Record<string, string[]> {
@@ -15,14 +15,22 @@ function parseAllowlist(env: NodeJS.ProcessEnv): Record<string, string[]> {
 }
 
 // ---- Rate limiting for test echo routes ----
-function keyFromReq(req: any): string {
+function keyFromReq(req: Request): string {
   const xf = req.get?.("x-forwarded-for");
-  if (typeof xf === "string" && xf.length > 0) {
-    const ip = xf.split(",")[0].trim();
-    return ipKeyGenerator(ip);
+  if (typeof xf === "string") {
+    // Take first IP in X-Forwarded-For
+    return xf.split(",")[0].trim();
   }
-  return ipKeyGenerator(req.ip);
+
+  // Fallbacks
+  return (
+    (req.ip as string) ||
+    // @ts-ignore – older Express types
+    (req.connection && (req.connection as any).remoteAddress) ||
+    "unknown"
+  );
 }
+
 
 function createTestEchoLimiter(env: NodeJS.ProcessEnv): express.RequestHandler {
   const windowMs = +(env.TEST_ECHO_WINDOW_MS || 60_000); // 1 minute default

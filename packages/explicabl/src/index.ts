@@ -7,11 +7,11 @@ import {
   type NextFunction,
   type RequestHandler,
 } from "express";
-import { healthRoutes } from "./health";
-import { auth0LogsWebhook } from "./webhooks/auth0LogWebhook";
+import { healthRoutes } from "./health.js";
+import { auth0LogsWebhook } from "./webhooks/auth0LogWebhook.js";
 
-export { healthRoutes } from "./health";
-export { auth0LogsWebhook } from "./webhooks/auth0LogWebhook";
+export { healthRoutes } from "./health.js";
+export { auth0LogsWebhook } from "./webhooks/auth0LogWebhook.js";
 
 /**
  * MVP Explicabl config
@@ -140,6 +140,8 @@ export function explicablLoggingMiddleware(
  * - logging/audit webhooks
  *
  * This preserves your existing behavior.
+ *
+ * This preserves your existing behavior.
  */
 export function explicablRouter(env: NodeJS.ProcessEnv): RequestHandler {
   const r = Router();
@@ -150,8 +152,11 @@ export function explicablRouter(env: NodeJS.ProcessEnv): RequestHandler {
   // Webhooks (auth0 logs, etc.)
   // NOTE: auth0LogsWebhook is already a RequestHandler in your current code,
   // so we do NOT call it as a function here.
+  // NOTE: auth0LogsWebhook is already a RequestHandler in your current code,
+  // so we do NOT call it as a function here.
   r.use("/webhooks/auth0", auth0LogsWebhook as unknown as RequestHandler);
 
   // Important: cast router to RequestHandler
   return r as unknown as RequestHandler;
 }
+
