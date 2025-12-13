@@ -31,7 +31,7 @@
 </p>
 
 ```bash
-npm install @gatewaystack/identifiabl @gatewaystack/proxyabl @gatewaystack/explicabl @gatewaystack/request-context \
+npm install @gatewaystack/identifiabl @gatewaystack/proxyabl @gatewaystack/explicabl @gatewaystack/request-context
 ```
 
 ## Status
