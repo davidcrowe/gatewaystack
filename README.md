@@ -1,7 +1,5 @@
 # GatewayStack 
 ## Agentic Control Plane for User-Scoped AI Governance
-# GatewayStack 
-## Agentic Control Plane for User-Scoped AI Governance
 
 <p align="center">
   <img src="./assets/gatewaystack-banner.png" alt="GatewayStack banner" />
@@ -209,6 +207,8 @@ npx ts-node app.ts
 ## Quickstart — CLI
 
 Clone the repo and run the reference gateway:
+
+```
 npx ts-node app.ts
 # or:
 # npx tsx app.ts
@@ -268,8 +268,6 @@ This starts:
 | **proxyabl**     | ✅ | Identity-aware routing for tools/models |
 | **explicabl**    | ✅ | Audit-grade request logging & health endpoints |
 
----
-
 ### GatewayStack vs Traditional API Gateways
 
 | Feature | Kong/Apigee/AWS API Gateway | GatewayStack |
@@ -320,17 +318,6 @@ This starts:
 
 - `@gatewaystack/request-context`, `@gatewaystack/integrations`, and additional `*-core` folders – Shared types, RequestContext helpers, and staging areas for upcoming connectors as the Agentic Control Plane expands.
 
----
-
-## Docs
-
-- [The Three-Party Problem](docs/three-party-problem.md)
-- [Examples](docs/examples.md)
-- [Demos](docs/demo.md)
-- [Environment & health endpoints](docs/operations.md)
-- [Deployment](docs/deployment.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Production checklist](docs/production-checklist.md)
 ## Docs
 
 - [The Three-Party Problem](docs/three-party-problem.md)
@@ -345,7 +332,6 @@ This starts:
 
 Run the full test suite:
 
-
 ```bash
 npm test
 ```
@@ -358,12 +344,5 @@ This runs Vitest plus the conformance report writer that updates `docs/conforman
 - Read [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Report issues on [GitHub Issues](https://github.com/davidcrowe/GatewayStack/issues)
 - Star the repo if GatewayStack helps you
-## Contributing
-
-- Run the tests: `npm test`
-- Read [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- Report issues on [GitHub Issues](https://github.com/davidcrowe/GatewayStack/issues)
-- Star the repo if GatewayStack helps you
-
 
 Built by [reducibl applied AI studio](https://reducibl.com)
